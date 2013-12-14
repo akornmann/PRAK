@@ -1,0 +1,24 @@
+Protocole de communication Client <-> Serveur pour le projet réseau
+
+Format du datagramme permettant la communication :
+
+struct Datagram
+{
+	int code;
+	char data[512];
+};
+
+(taille totale : 516 octets)
+
+
+code = 0
+Opération Toc Toc
+la valeur de data n'a pas d'importance
+Quand le client recoit Toc Toc, il répond Toc Toc au serveur.
+Quand le serveur recoit Toc Toc, il répond Toc Toc au client.
+Cette opération permet de vérifier si un serveur est opérationnel, ou si un client est toujours connecté.
+
+
+code = 1
+Demande de fichier
+La valeur de data contient le nom du fichier à envoyer par le serveur

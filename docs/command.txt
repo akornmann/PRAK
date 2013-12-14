@@ -1,0 +1,5 @@
+Liste des commandes disponibles sur le client :
+
+connect [ip:port|ip port]
+status
+exit
