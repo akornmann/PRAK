@@ -21,8 +21,23 @@ string Converter::cstos(char* cstr)
 	return s;
 }
 
-const char* Converter::stocs(string s)
+const char* Converter::stocs(string str)
 {
-	return s.c_str();
+	return str.c_str();
 }
 
+vector<string> Converter::split(string str, string delim)
+{ 
+      unsigned start = 0;
+      unsigned end; 
+      vector<string> v; 
+
+      while((end = str.find(delim, start)) != string::npos)
+      { 
+            v.push_back(str.substr(start, end-start)); 
+            start = end + delim.length(); 
+      }
+
+      v.push_back(str.substr(start)); 
+      return v; 
+}

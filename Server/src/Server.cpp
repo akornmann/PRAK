@@ -67,31 +67,29 @@ bool Server::receive(int s)
 {
 	_log->write("Server::receive","socket used : "+Converter::itos(s));
 	Datagram buffer;
-	memset(&buffer,0,sizeof buffer);
+	memset(&buffer,0,DGSIZE);
 	
-	_r = recvfrom(s,&buffer,516,0,(struct sockaddr*) &_client_addr, &_client_len);
+	_r = recvfrom(s,&buffer,DGSIZE,0,(struct sockaddr*) &_client_addr, &_client_len);
 	_addr = new AddrStorage((struct sockaddr*) &_client_addr, _log);
        
-	char answer[] = "Qui est là ?";
-	strcpy (buffer.data,answer);
-	_r = sendto(s, &buffer, 516, 0, _addr->sockaddr(), _addr->len());
-	_log->write("Server::receive","send back to "+_addr->paddr()+":"+_addr->pport());
+	toctoc(_addr);
 	return true;
 }
 
 bool Server::send_to(Datagram* dg, AddrStorage* addr)
 {
-	//_r = sendto(addr->s(), dg, 516, 0, addr->sockaddr(), addr->len());
+	_r = sendto(3,dg, DGSIZE, 0, addr->sockaddr(), addr->len());
 	return true;
 }
 
 void Server::toctoc(AddrStorage* addr)
 {
 	Datagram dg;
+	memset(&dg,0,DGSIZE);
 	dg.code = 0;
-	memset(&dg.data,0, 512);
-	char answer[] = "Toc toc";
-	strcpy(dg.data,answer);
+	dg.seq = 0;
+	string s = "Qui est là ?";
+	strcpy(dg.data,Converter::stocs(s));
 	
 	send_to(&dg, addr);
 }

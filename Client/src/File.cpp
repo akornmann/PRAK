@@ -13,7 +13,7 @@ void File::set_file(std::string file)
 void File::write(const std::string &msg)
 {
 	std::ofstream out(_file.c_str(), std::ios_base::out | std::ios_base::app);
-	out << msg << std::endl;
+	out << msg;
 }
 
 void File::write(const std::string &prefix, const std::string &msg)

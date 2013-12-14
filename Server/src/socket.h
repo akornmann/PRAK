@@ -18,18 +18,34 @@
 #include <unistd.h>
 #include <netdb.h>
 
+//fork
+#include <sys/times.h>
+#include <inttypes.h>
+#include <sys/wait.h>
+
 #define MAXSOCK 5
 
 
 struct Datagram
 {
 	int code;
+	int seq;
 	char data[512];
 };
 
+#define DGSIZE 520
 
 enum Code
 {
 	TOCTOC,
 };
+
+enum Status
+{
+	CONNECT,
+	DISCONNECT,
+	SEND_FILE,
+	RECEIVE_FILE,
+};
+
 #endif

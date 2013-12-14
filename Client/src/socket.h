@@ -29,9 +29,11 @@
 struct Datagram
 {
 	int code;
+	int seq;
 	char data[512];
 };
 
+#define DGSIZE 520
 
 enum Code
 {

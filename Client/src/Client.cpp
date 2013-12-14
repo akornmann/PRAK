@@ -60,7 +60,7 @@ bool Client::disconnect()
 
 bool Client::send_to(Datagram* dg, AddrStorage* addr)
 {
-	_r = sendto(_socket, dg, 516, 0, addr->sockaddr(), addr->len());
+	_r = sendto(_socket, dg, DGSIZE, 0, addr->sockaddr(), addr->len());
 	_log->write("Client::send_to", dg->data);
 	return true;
 }
@@ -75,7 +75,7 @@ bool Client::receive_from(Datagram* dg, AddrStorage* addr)
 	{
 		memset(dg,0,sizeof(Datagram));
 
-		if((_r = recvfrom(_socket, dg, 516, 0, (struct sockaddr*) &_server_addr, &_server_len)) !=-1)
+		if((_r = recvfrom(_socket, dg, DGSIZE, 0, (struct sockaddr*) &_server_addr, &_server_len)) !=-1)
 		{
 			addr = new AddrStorage((struct sockaddr*) &_server_addr, _log);
 			_log->write("Client::receive_from",dg->data);
@@ -101,10 +101,11 @@ bool Client::receive_from(Datagram* dg, AddrStorage* addr)
 void Client::toctoc(AddrStorage* addr)
 {
 	Datagram dg;
+	memset(&dg,0,DGSIZE);
 	dg.code = 0;
-	memset(&dg.data,0, 512);
-	char answer[] = "Qui est là ?";
-	strcpy (dg.data,answer);
+	dg.seq = 0;
+	string s = "Qui est là ?";
+	strcpy(dg.data,Converter::stocs(s));
 	
 	send_to(&dg, addr);
 }
@@ -112,10 +113,11 @@ void Client::toctoc(AddrStorage* addr)
 bool Client::do_toctoc()
 {
 	Datagram dg;
+	memset(&dg,0, DGSIZE);
 	dg.code = 0;
-	memset(&dg.data,0, 512);
-	char ask[] = "Toc toc";
-	strcpy(dg.data,ask);
+	dg.seq = 0;
+	string s = "Toc toc";
+	strcpy(dg.data,Converter::stocs(s));
 	
 	send_to(&dg, _server);
 	
@@ -173,5 +175,18 @@ bool Client::server_select()
 
 bool Client::do_file(string file)
 {
+	if(_status != CONNECT) return false;
+
+	_status = RECEIVE_FILE;
+	
+	//Fichier destination;
+	File f(file);
+	string data;
+	
+	Datagram ask_file;
+	ask_file.code = 1;
+	ask_file.seq = 0;
+	
+
 	return true;
 }

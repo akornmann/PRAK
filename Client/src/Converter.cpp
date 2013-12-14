@@ -21,9 +21,9 @@ string Converter::cstos(char* cstr)
 	return s;
 }
 
-const char* Converter::stocs(string s)
+const char* Converter::stocs(string str)
 {
-	return s.c_str();
+	return str.c_str();
 }
 
 vector<string> Converter::split(string str, string delim)

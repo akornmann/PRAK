@@ -61,7 +61,7 @@ AddrStorage::AddrStorage(string addr, string port, File* log)
 		_addr_ipv4->sin_port = _n_port;
 		_len = sizeof *_addr_ipv4;
 	}
-	else _log->write("AddrStorage","Format d'adresse inconnue");
+	else _log->write("AddrStorage","Format d'adresse inconnue ("+_p_port+":"+_p_addr+")");
 
 	_sockaddr = (struct sockaddr*) &_addr;
 }
