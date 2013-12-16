@@ -17,17 +17,36 @@ string Client::status()
 	return s;
 }
 
+bool Client::init(Datagram* dg, int code, int seq, string s)
+{
+	if(s.length()>=512)
+	{
+		_log->write("Client::init","Datagram overflow");
+		return false;
+	}
+	else
+	{
+		memset(dg,0,DGSIZE);
+		
+		dg->code = code;
+		dg->seq = seq;
+		strcpy(dg->data,Converter::stocs(s));
+		return true;
+	}
+}
+
+bool Client::init(Datagram* dg, int code, int seq)
+{
+	string s = "";
+	return init(dg, code, seq, s);
+}
+
 Client::Client()
 {
 	_conf = new File("server.cfg");
 	_log = new File("/home/kalex/.log/PRAK/Client.log");
 
-	_server_len = sizeof(struct sockaddr_storage);
-
-	_time_val.tv_sec = 1;
-	_time_val.tv_usec = 0;
-	Status s = DISCONNECT;
-	set_status(s);
+	_status=DISCONNECT;
 }
 
 Client::~Client()
@@ -37,113 +56,123 @@ Client::~Client()
 
 bool Client::connect(string addr, string port)
 {
-	_server = new AddrStorage(addr,port,_log);
-	// Creation socket UDP
-	_socket = socket(_server->family(), SOCK_DGRAM, 0);
-	_log->write("Client::connect","Socket "+Converter::itos(_socket)+" open");
 
-	int o = 1 ;
-	setsockopt(_socket, SOL_SOCKET, SO_BROADCAST, &o, sizeof o);
+	_server = new AddrStorage(addr,port,-1,_log);
+
+	// Creation socket UDP
+	int s = socket(_server->family(), SOCK_DGRAM, 0);
 	
-	return do_toctoc();
+	int o = 1 ;
+	setsockopt(s, SOL_SOCKET, SO_BROADCAST, &o, sizeof o);
+
+	_server->socket(s);
+	
+
+	if(is_connect())
+	{
+		_status = CONNECT;
+		return true;
+	}
+	else return false;
 }
 
 bool Client::disconnect()
 {
-	_log->write("Client::disconnect","Socket "+Converter::itos(_socket)+" closed\n\n\n");
-	close(_socket);
+	_log->write("Client::disconnect","Socket "+Converter::itos(_server->socket())+" closed\n\n\n");
+	close(_server->socket());
 	free(_server);
-	Status s = DISCONNECT;
-	set_status(s);
+	_status = DISCONNECT;
 	return true;
 }
 
 bool Client::send_to(Datagram* dg, AddrStorage* addr)
 {
-	_r = sendto(_socket, dg, DGSIZE, 0, addr->sockaddr(), addr->len());
-	_log->write("Client::send_to", dg->data);
-	return true;
+	_r = sendto(addr->socket(), dg, DGSIZE, 0, addr->sockaddr(), addr->len());
+	return (_r!=-1);
 }
 
 bool Client::receive_from(Datagram* dg, AddrStorage* addr)
 {
+	struct sockaddr_storage temp_addr;
+	socklen_t temp_len;
+	struct timeval time_val;
 	fd_set readfds;
+
+	int s = addr->socket();
+
+	temp_len = sizeof(struct sockaddr_storage);
+
+	time_val.tv_sec = 1;
+	time_val.tv_usec = 0;
+
 	FD_ZERO(&readfds);
-	FD_SET(_socket, &readfds);
+	FD_SET(addr->socket(), &readfds);
 
-	if(select(_socket+1, &readfds, NULL, NULL, &_time_val))
+	if(select(s+1, &readfds, NULL, NULL, &time_val))
 	{
-		memset(dg,0,sizeof(Datagram));
+		init(dg,0,0);
+		_r = recvfrom(s, dg, DGSIZE, 0, (struct sockaddr*) &temp_addr, &temp_len);
 
-		if((_r = recvfrom(_socket, dg, DGSIZE, 0, (struct sockaddr*) &_server_addr, &_server_len)) !=-1)
-		{
-			addr = new AddrStorage((struct sockaddr*) &_server_addr, _log);
-			_log->write("Client::receive_from",dg->data);
-			return true;
-		}
-		else
-		{
-			_log->write("Client::receive_from","recvfrom failed");
-			return false;
-		}
+		addr = new AddrStorage((struct sockaddr*) &temp_addr,s, _log);
+
+		return (_r!=-1);		
 	}
 	else
 	{
 		_log->write("Client::receive_from","Timer expired");
-
-		_time_val.tv_sec = 1;
-		_time_val.tv_usec = 0;
-
 		return false;
 	}
 }
 
-void Client::toctoc(AddrStorage* addr)
+
+/*
+ *
+ * Protocoles de base
+ *
+ *
+ */
+
+void Client::toctoc(Datagram* dg, AddrStorage* addr)
 {
-	Datagram dg;
-	memset(&dg,0,DGSIZE);
-	dg.code = 0;
-	dg.seq = 0;
-	string s = "Qui est là ?";
-	strcpy(dg.data,Converter::stocs(s));
-	
-	send_to(&dg, addr);
+	dg->seq++;
+	send_to(dg, addr);
 }
 
-bool Client::do_toctoc()
+
+
+/*
+ *
+ * Surcouche client
+ *
+ *
+ */
+
+bool Client::is_connect()
 {
 	Datagram dg;
-	memset(&dg,0, DGSIZE);
-	dg.code = 0;
-	dg.seq = 0;
-	string s = "Toc toc";
-	strcpy(dg.data,Converter::stocs(s));
-	
+	init(&dg,0,0,"Je test");
+
 	send_to(&dg, _server);
-	
+
 	if(receive_from(&dg, _server))
 	{
-		if(dg.code==0)
+		if(dg.code==0&&dg.seq==1)
 		{
-			_log->write("do_toctoc", "Server answer successfull");
-			Status s = CONNECT;
-			set_status(s);
+			_log->write("Client::is_connect", "Server answer successfull");
 			return true;
 		}
 		else
 		{
-			_log->write("do_toctoc", "Bad server answer");
+			_log->write("Client::is_connect", "Bad server answer");
 			return false;
 		}
 	}
 	else
 	{
-		_log->write("do_toctoc", "No server answer");
+		_log->write("Client::is_connect", "No server answer");
 		return false;
 	}
 }
-
-
 
 bool Client::server_select()
 {
@@ -173,20 +202,7 @@ bool Client::server_select()
 }
 
 
-bool Client::do_file(string file)
+bool Client::get_file(string file)
 {
-	if(_status != CONNECT) return false;
-
-	_status = RECEIVE_FILE;
-	
-	//Fichier destination;
-	File f(file);
-	string data;
-	
-	Datagram ask_file;
-	ask_file.code = 1;
-	ask_file.seq = 0;
-	
-
 	return true;
 }

@@ -94,7 +94,7 @@ void Shell::file(vector<string> v)
 	switch(v.size())
 	{
 	case 2 :
-		c.do_file(v[1]);
+		c.get_file(v[1]);
 		return;
 	default :
 		error();

@@ -13,13 +13,7 @@ using namespace std;
 class Client
 {
  private :
-	struct sockaddr_storage _server_addr;
-	socklen_t _server_len;
-	struct timeval _time_val;
-
 	AddrStorage* _server;
-
-	int _socket;
 
 	int _r;
 	File* _conf;
@@ -32,25 +26,28 @@ class Client
 	~Client();
 	bool connect(string addr, string port);
 	bool disconnect();
+
+	//Gestion des datagrammes
+	bool init(Datagram* dg, int code, int seq, string s);
+	bool init(Datagram* dg, int code, int seq);	
+
+	//Envoi/reception de datagrammes
 	bool send_to(Datagram* dg, AddrStorage* addr);
 	bool receive_from(Datagram* dg, AddrStorage* addr);
 
 	//Protocole de base
-	void toctoc(AddrStorage* addr);
+	void toctoc(Datagram* dg, AddrStorage* addr);
+	bool get_file(string file, AddrStorage* addr);
+	bool send_file(string file, AddrStorage* addr);
 
 	//Surcouche client
-	//Protocole toctoc
-	bool do_toctoc();
+	bool is_connect();
 	bool server_select();
-
-	//Protocole file
-	bool do_file(string file);
-
+	bool get_file(string file);
+	bool send_file(string file);
 
 	//setter/getter
 	void set_conf(string cfg) { _conf->set_file(cfg); }
-	void set_error(string e) { _error = e; }
-	void set_status(Status s) { _status = s; }
 	string error() { return _error; }
 	string status();
 };

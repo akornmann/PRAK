@@ -16,6 +16,8 @@ class AddrStorage
 	struct sockaddr* _sockaddr;
 	int _n_port;
 	
+	int _socket;
+
 	socklen_t _len;
 	int _family;
 
@@ -25,14 +27,16 @@ class AddrStorage
 	File* _log;
 
  public :
-	AddrStorage(struct sockaddr* addr, File* log); //From Server side : client address
-	AddrStorage(string addr, string port, File* log); //From Client side : server address
+	AddrStorage(struct sockaddr* addr, int s, File* log); //From Server side : client address
+	AddrStorage(string addr, string port, int s, File* log); //From Client side : server address
 
 	int family();
 	struct sockaddr* sockaddr();
 	socklen_t len();
 	string paddr();
 	string pport();
+	int socket();
+	void socket(int s);
 };
 
 #endif

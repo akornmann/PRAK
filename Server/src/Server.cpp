@@ -1,5 +1,29 @@
 #include "Server.h"
 
+bool Server::init(Datagram* dg, int code, int seq, string s)
+{
+	if(s.length()>=512)
+	{
+		_log->write("Client::init","Datagram overflow");
+		return false;
+	}
+	else
+	{
+		memset(dg,0,DGSIZE);
+		
+		dg->code = code;
+		dg->seq = seq;
+		strcpy(dg->data,Converter::stocs(s));
+		return true;
+	}
+}
+
+bool Server::init(Datagram* dg, int code, int seq)
+{
+	string s = "";
+	return init(dg, code, seq, s);
+}
+
 Server::Server(string port)
 {
 	_log = new File("/home/kalex/.log/PRAK/Server.log");
@@ -12,13 +36,12 @@ Server::Server(string port)
 	_r = getaddrinfo(NULL,_port.c_str(),&_local,&_start);
 	_n_socks = 0;
 
-	_client_len = sizeof(struct sockaddr_storage);
-
 	_log->write("Server::Server","Server started");
 }
 
 Server::~Server()
 {
+	disconnect();
 	_log->write("Server::Server","Server stoped");
 }
 
@@ -63,33 +86,70 @@ bool Server::connect()
 	return true;
 }
 
+bool Server::disconnect()
+{
+	for(int i = 0; i<_n_socks; i++)
+	{
+		close(_sockets[i]);
+	}
+	return true;
+}
+
 bool Server::receive(int s)
 {
-	_log->write("Server::receive","socket used : "+Converter::itos(s));
+	struct sockaddr_storage temp_addr;
+	socklen_t temp_len;
+	temp_len = sizeof(struct sockaddr_storage);
+
 	Datagram buffer;
 	memset(&buffer,0,DGSIZE);
 	
-	_r = recvfrom(s,&buffer,DGSIZE,0,(struct sockaddr*) &_client_addr, &_client_len);
-	_addr = new AddrStorage((struct sockaddr*) &_client_addr, _log);
-       
-	toctoc(_addr);
-	return true;
+	_r = recvfrom(s,&buffer,DGSIZE,0,(struct sockaddr*) &temp_addr, &temp_len);
+	AddrStorage* addr = new AddrStorage((struct sockaddr*) &temp_addr, s, _log);
+
+	return process(&buffer,addr);
 }
 
 bool Server::send_to(Datagram* dg, AddrStorage* addr)
 {
-	_r = sendto(3,dg, DGSIZE, 0, addr->sockaddr(), addr->len());
+	_r = sendto(addr->socket(),dg, DGSIZE, 0, addr->sockaddr(), addr->len());
 	return true;
 }
 
-void Server::toctoc(AddrStorage* addr)
+
+/*
+ *
+ * Protocoles de base
+ *
+ *
+ */
+
+bool Server::toctoc(Datagram* dg, AddrStorage* addr)
 {
-	Datagram dg;
-	memset(&dg,0,DGSIZE);
-	dg.code = 0;
-	dg.seq = 0;
-	string s = "Qui est là ?";
-	strcpy(dg.data,Converter::stocs(s));
-	
-	send_to(&dg, addr);
+	dg->seq++;
+	return send_to(dg, addr);
+}
+
+/*
+ *
+ * Surcouche serveur
+ *
+ *
+ */
+
+bool Server::process(Datagram* dg, AddrStorage* addr)
+{
+	bool res = false;
+	switch(dg->code)
+	{
+	case 0 :
+		res = toctoc(dg,addr);
+		break;
+	case 1 :
+		break;
+	default :
+		break;
+	}
+
+	return res;
 }

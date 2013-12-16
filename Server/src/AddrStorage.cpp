@@ -1,8 +1,9 @@
 #include "AddrStorage.h"
 
-AddrStorage::AddrStorage(struct sockaddr* addr, File* log)
+AddrStorage::AddrStorage(struct sockaddr* addr, int s, File* log)
 {
 	_log = log;
+	_socket = s;
 	_sockaddr = addr;
 	_family = addr->sa_family;
 	_len = sizeof *addr;
@@ -32,9 +33,10 @@ AddrStorage::AddrStorage(struct sockaddr* addr, File* log)
 	_p_addr = Converter::cstos(paddr);
 }
 
-AddrStorage::AddrStorage(string addr, string port, File* log)
+AddrStorage::AddrStorage(string addr, string port, int s, File* log)
 {
 	_log = log;
+	_socket = s;
 
 	_p_port = port;
 	_p_addr = addr;
@@ -89,4 +91,15 @@ string AddrStorage::paddr()
 string AddrStorage::pport()
 {
 	return _p_port;
+}
+
+int AddrStorage::socket()
+{
+	return _socket;
+}
+
+void AddrStorage::socket(int s)
+{
+	_socket = s;
+	return;
 }
