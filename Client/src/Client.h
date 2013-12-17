@@ -30,21 +30,20 @@ class Client
 	//Gestion des datagrammes
 	bool init(Datagram* dg, int code, int seq, string s);
 	bool init(Datagram* dg, int code, int seq);	
+	void show(string prefix, Datagram* dg);
 
 	//Envoi/reception de datagrammes
 	bool send_to(Datagram* dg, AddrStorage* addr);
 	bool receive_from(Datagram* dg, AddrStorage* addr);
 
 	//Protocole de base
-	void toctoc(Datagram* dg, AddrStorage* addr);
+	bool toctoc(Datagram* dg, AddrStorage* addr);
 	bool get_file(string file, AddrStorage* addr);
-	bool send_file(string file, AddrStorage* addr);
 
 	//Surcouche client
 	bool is_connect();
 	bool server_select();
 	bool get_file(string file);
-	bool send_file(string file);
 
 	//setter/getter
 	void set_conf(string cfg) { _conf->set_file(cfg); }

@@ -19,6 +19,8 @@ class File
 
  private :
 	std::string _file;
+	std::ofstream _out;
+	std::ifstream _in;
 };
 
 #endif

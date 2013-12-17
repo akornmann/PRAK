@@ -14,19 +14,32 @@ struct Datagram
 
 code = 0
 Opération Toc Toc
-Le numéro de séquanece permet de vérifier qu'on a bien la réponse à la question...
+Le numéro de séquence permet de vérifier qu'on a bien la réponse à la question...
 la valeur de data n'a pas d'importance
 Quand le client recoit Toc Toc, il répond Toc Toc au serveur.
 Quand le serveur recoit Toc Toc, il répond Toc Toc au client.
 Cette opération permet de vérifier si un serveur est opérationnel, ou si un client est toujours connecté.
 
-code = 1
-Demande de fichier
-Le numéro de séquence n'a aucune importance
-La valeur de data contient le nom du fichier à envoyer par le serveur
 
-code = 1
-Longueur du fichier
-Numéro de séquence = longueur du fichier
-Valeur de data aucune importance
+Protocole d'échange de fichier
+A demande un fichier à B
 
+A :
+code = 1
+seq = -1
+data = nom du fichier demandé
+
+B :
+code = 1
+seq = taille du fichier
+data = .
+
+A :
+code = 1
+seq = 0
+data = .
+
+B :
+code = 1
+seq = seq précédente + taille de data
+data = fichier partiel a envoyer

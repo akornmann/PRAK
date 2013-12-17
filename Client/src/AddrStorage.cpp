@@ -102,3 +102,10 @@ void AddrStorage::socket(int s)
 {
 	_socket = s;
 }
+
+
+void AddrStorage::show()
+{
+	cout << "Adresse IP : " << paddr() << endl
+	     << "  Port UDP : " << pport() << endl;
+}

@@ -1,19 +1,22 @@
 #include "File.h"
 #include "socket.h"
+
 File::File(const std::string file):_file(file)
 {
+	_out.open(_file.c_str(), std::ios_base::app);
+	_in.open(_file.c_str());
 }
+
 void File::set_file(std::string file)
 {
 	_file = file;
 	return;
 }
 
-
 void File::write(const std::string &msg)
 {
 	std::ofstream out(_file.c_str(), std::ios_base::out | std::ios_base::app);
-	out << msg;
+	if(out)	out << msg;
 }
 
 void File::write(const std::string &prefix, const std::string &msg)
@@ -43,11 +46,14 @@ std::string File::read(int n)
 		std::ifstream in(_file.c_str(), std::ifstream::in);
 		char buffer[1024];
 		int i = 0;
+		if(in)
+		{
+			while(i<n && in.getline(buffer,1024)) i++;
+			std::string res(buffer);	
+			return res;
+		}
+		else return "end";
 		
-		while(i<n && in.getline(buffer,1024)) i++;
-		
-		std::string res(buffer);	
-		return res;
 	}
 }
 

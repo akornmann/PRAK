@@ -34,6 +34,7 @@ class Server
 	//Gestion des datagrammes
 	bool init(Datagram* dg, int code, int seq, string s);
 	bool init(Datagram* dg, int code, int seq);
+	void show(string prefix, Datagram* dg);
 
 	//Envoi/reception de datagrammes
 	bool receive(int s);
@@ -41,11 +42,9 @@ class Server
 
 	//Protocole de base
 	bool toctoc(Datagram* dg, AddrStorage* addr);
-	bool get_file(string file, AddrStorage* addr);
-	bool send_file(string file, AddrStorage* addr);
+	bool get_file(Datagram* dg, AddrStorage* addr);
+	bool send_file(Datagram* dg, AddrStorage* addr);
 	
 	//Surcouche serveur
 	bool process(Datagram* dg, AddrStorage* addr);
-	bool get_file(string file);
-	bool send_file(string file);
 };

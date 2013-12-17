@@ -37,6 +37,8 @@ class AddrStorage
 	string pport();
 	int socket();
 	void socket(int s);
+
+	void show();
 };
 
 #endif

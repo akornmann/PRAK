@@ -1,4 +1,5 @@
 #include "Client.h"
+
 string Client::status()
 {
 	string s = "";
@@ -39,6 +40,16 @@ bool Client::init(Datagram* dg, int code, int seq)
 {
 	string s = "";
 	return init(dg, code, seq, s);
+}
+
+void Client::show(string prefix, Datagram* dg)
+{
+	cout << prefix << endl
+	     << "Code : " << dg->code << endl
+	     << " Seq : " << dg->seq << endl
+	     << "Data : " << dg->data << endl;
+
+		return;
 }
 
 Client::Client()
@@ -132,13 +143,42 @@ bool Client::receive_from(Datagram* dg, AddrStorage* addr)
  *
  */
 
-void Client::toctoc(Datagram* dg, AddrStorage* addr)
+bool Client::toctoc(Datagram* dg, AddrStorage* addr)
 {
 	dg->seq++;
-	send_to(dg, addr);
+	return send_to(dg, addr);
 }
 
 
+bool Client::get_file(string file, AddrStorage* addr)
+{
+	bool error = false;
+	Datagram s;
+	init(&s,1,-1,file);
+	send_to(&s, addr);
+
+	Datagram r;
+	init(&r,0,0);
+	receive_from(&r, addr);
+	
+	if(r.code == 1)
+	{
+		int size = r.seq;
+	
+		File f(file);
+		
+		init(&s,1,0,"Ready to receive");
+		
+	}
+	else
+	{
+		_log->write("Client::get_file","Server does not find file "+file);
+		_error = "File not found.";
+	}
+
+
+	return error;
+}
 
 /*
  *
@@ -150,7 +190,7 @@ void Client::toctoc(Datagram* dg, AddrStorage* addr)
 bool Client::is_connect()
 {
 	Datagram dg;
-	init(&dg,0,0,"Je test");
+	init(&dg,0,0);
 
 	send_to(&dg, _server);
 
@@ -201,8 +241,13 @@ bool Client::server_select()
 	return found;
 }
 
-
 bool Client::get_file(string file)
 {
+	//Trouver un serveur convenable
+	if(_status == DISCONNECT) server_select();
+
+	_status = ACTIVE;
+	get_file(file,_server);
+	_status = CONNECT;
 	return true;
 }

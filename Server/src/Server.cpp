@@ -24,6 +24,16 @@ bool Server::init(Datagram* dg, int code, int seq)
 	return init(dg, code, seq, s);
 }
 
+void Server::show(string prefix, Datagram* dg)
+{
+	cout << prefix << endl
+	     << "Code : " << dg->code << endl
+	     << " Seq : " << dg->seq << endl
+	     << "Data : " << dg->data << endl;
+
+		return;
+}
+
 Server::Server(string port)
 {
 	_log = new File("/home/kalex/.log/PRAK/Server.log");
@@ -130,6 +140,28 @@ bool Server::toctoc(Datagram* dg, AddrStorage* addr)
 	return send_to(dg, addr);
 }
 
+bool Server::send_file(Datagram* dg, AddrStorage* addr)
+{
+	string file = "";
+	switch(dg->seq)
+	{
+	case -1 :
+		//trouver le fichier local ou à l'exterieur !
+		file = dg->data;
+		dg->seq = 2532;
+		send_to(dg, addr);
+		break;
+	case 0:
+		break;
+		
+	default :
+		cout << "End of transfer" << endl;
+		break;
+	}
+
+	return true;
+}
+
 /*
  *
  * Surcouche serveur
@@ -140,12 +172,16 @@ bool Server::toctoc(Datagram* dg, AddrStorage* addr)
 bool Server::process(Datagram* dg, AddrStorage* addr)
 {
 	bool res = false;
+
+	cout << "process " << dg->code << endl;
+
 	switch(dg->code)
 	{
 	case 0 :
 		res = toctoc(dg,addr);
 		break;
 	case 1 :
+		res = send_file(dg,addr);
 		break;
 	default :
 		break;

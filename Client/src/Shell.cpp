@@ -27,7 +27,7 @@ void Shell::wait_command()
 	else if(ask == "connect") connect(v);
 	else if(ask == "disconnect") disconnect();
 	else if(ask == "file") file(v);
-	else error();
+	else fail();
 
 	wait_command();
 }
@@ -48,7 +48,8 @@ void Shell::status()
 
 void Shell::error()
 {
-	cout << "Command unknow" << endl;
+	string e = c.error();
+	cout << e << endl;
 	return;
 }
 
@@ -75,7 +76,7 @@ void Shell::connect(vector<string> cmd)
 		cout << "Connecting to a specified server" << endl;
 		break;
 	default :
-		error();
+		fail();
 		break;
 	}
 	status();
@@ -91,15 +92,18 @@ void Shell::disconnect()
 
 void Shell::file(vector<string> v)
 {
+	bool succes = false;
 	switch(v.size())
 	{
 	case 2 :
-		c.get_file(v[1]);
+		succes = c.get_file(v[1]);
 		return;
 	default :
-		error();
+		fail();
 		return;
 	}
+
+	if(!succes) error();
 	
 	return;
 }
