@@ -67,7 +67,6 @@ Client::~Client()
 
 bool Client::connect(string addr, string port)
 {
-
 	_server = new AddrStorage(addr,port,-1,_log);
 
 	// Creation socket UDP
@@ -77,7 +76,6 @@ bool Client::connect(string addr, string port)
 	setsockopt(s, SOL_SOCKET, SO_BROADCAST, &o, sizeof o);
 
 	_server->socket(s);
-	
 
 	if(is_connect())
 	{
@@ -163,7 +161,7 @@ bool Client::get_file(string file, AddrStorage* addr)
 	
 	if(r.code == 1)
 	{
-		int size = r.seq;
+		//int size = r.seq;
 	
 		File f(file);
 		
