@@ -7,6 +7,7 @@
 class File
 {
  public :
+	File() {};
 	File(const std::string file);
 	void write(const std::string &msg);
 	void write(const std::string &prefix, const std::string &msg);

@@ -143,18 +143,48 @@ bool Server::toctoc(Datagram* dg, AddrStorage* addr)
 bool Server::send_file(Datagram* dg, AddrStorage* addr)
 {
 	string file = "";
+	int end_size = 0, seq = 0, size = 0, packet_number = 0;
+
+	Datagram s;
+	char* buffer;
+	
 	switch(dg->seq)
 	{
 	case -1 :
 		//trouver le fichier local ou à l'exterieur !
 		file = dg->data;
-		dg->seq = 2532;
-		send_to(dg, addr);
+		_curr.set_file(file);
+		size = _curr.size();
+		dg->seq = size;
+		
+		send_to(dg,addr);
 		break;
-	case 0:
+	case 0 :
+		packet_number = ceil((float) _curr.size()/ (float) (DATASIZE-1));
+		size = _curr.size();
+		for(int i=1;i<=packet_number;i++)
+		{
+			if(i*(DATASIZE-1)<=size) //C'est un paquet intermediaire, data est complet.
+			{
+				seq = i*(DATASIZE-1);
+				buffer = _curr.readChar(DATASIZE-1); //Buffer sera de taille DATASIZE (avec le \0 final)
+				init(&s,1,seq,Converter::cstos(buffer));
+				send_to(&s,addr);
+			}
+			else //C'est le paquet final
+			{
+				end_size = size-(i-1)*(DATASIZE-1);
+				buffer = _curr.readChar(end_size);
+				init(&s,1,size,Converter::cstos(buffer));
+				
+				send_to(&s,addr);
+			}
+		}
+
 		break;
 		
 	default :
+		
 		cout << "End of transfer" << endl;
 		break;
 	}
@@ -172,8 +202,6 @@ bool Server::send_file(Datagram* dg, AddrStorage* addr)
 bool Server::process(Datagram* dg, AddrStorage* addr)
 {
 	bool res = false;
-
-	cout << "process " << dg->code << endl;
 
 	switch(dg->code)
 	{

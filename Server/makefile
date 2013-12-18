@@ -17,7 +17,5 @@ $(EXEC): $(OBJS)
 	$(CXX) $(CFLAGS) -o $@ -c $<
 
 clean :
-	rm -rf bin/*.o rm -rf bin/*~ rm -rf src/*~ rm bin/log*
-cleaner : clean
-	rm -rf $(EXEC)
+	rm -rf bin/* rm -rf src/*~ rm -rf src/#*
 

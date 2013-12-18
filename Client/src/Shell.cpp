@@ -26,7 +26,7 @@ void Shell::wait_command()
 	else if(ask == "status") status();
 	else if(ask == "connect") connect(v);
 	else if(ask == "disconnect") disconnect();
-	else if(ask == "file") file(v);
+	else if(ask == "dl") file(v);
 	else fail();
 
 	wait_command();

@@ -13,11 +13,10 @@ all: $(EXEC)
 $(EXEC): $(OBJS)
 	$(CXX) $(CFLAGS) -o $@ $^
 	mv *.o bin
+	cp src/server.cfg bin
 %.o: %.cpp
 	$(CXX) $(CFLAGS) -o $@ -c $<
 
 clean :
-	rm -rf bin/*.o rm -rf bin/*~ rm -rf src/*~ rm bin/log*
-cleaner : clean
-	rm -rf $(EXEC)
+	rm -rf bin/*  rm -rf src/*~
 

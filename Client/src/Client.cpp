@@ -157,21 +157,65 @@ bool Client::get_file(string file, AddrStorage* addr)
 
 	Datagram r;
 	init(&r,0,0);
-	receive_from(&r, addr);
-	
-	if(r.code == 1)
+	if(receive_from(&r, addr))
 	{
-		//int size = r.seq;
-	
-		File f(file);
+		if(r.code == 1)
+		{
+			int size = r.seq;
+			if(size>0)
+			{
+				char* res = new char[size+1];
+				res[size] = '\0';
+				res[0] = 'x';
+				res[size-1] = 'x';
+			
+				int packet_number = ceil((float) size / (float) (DATASIZE-1));
+				init(&s,1,0,"Ready to receive");
+				send_to(&s, addr);
+				
+				
+				
+				while(receive_from(&r, addr))
+				{
+					if(r.seq%(DATASIZE-1)==0)
+					{
+						int init = r.seq-(DATASIZE-1); 
+						for(int i=init;i<=r.seq;i++)
+						{
+							res[i] = r.data[i-init];
+						}
+					}
+					else
+					{
+						int end_size = size-(packet_number-1)*(DATASIZE-1);
+						int init = r.seq-end_size;
+						for(int i=init;i<=r.seq;i++)
+						{
+							res[i] = r.data[i-init];
+						}
+					}
+				}
+
+
+				cout  << res << endl;
+			}
+			else
+			{
+				_log->write("Client::get_file","Server does not find file "+file+" or he is empty");
+				_error = "File doesn't exist or is empty.";	
+			}
 		
-		init(&s,1,0,"Ready to receive");
-		
+		}
+		else
+		{
+			_log->write("Client::get_file","Server does not find file "+file);
+			_error = "File not found.";
+		}
 	}
 	else
 	{
-		_log->write("Client::get_file","Server does not find file "+file);
-		_error = "File not found.";
+		_log->write("Client::get_file","Server does not answer");
+		_error = "No answer.";
 	}
 
 

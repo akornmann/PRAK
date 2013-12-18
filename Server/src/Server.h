@@ -25,6 +25,8 @@ class Server
 
 	struct addrinfo _local, *_iterator, *_start;
 
+	File _curr;
+
  public :
 	Server(string port);
 	~Server();

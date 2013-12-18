@@ -1,15 +1,18 @@
 #include "File.h"
 #include "socket.h"
 
-File::File(const std::string file):_file(file)
+File::File(const std::string file)
 {
-	_out.open(_file.c_str(), std::ios_base::app);
-	_in.open(_file.c_str());
+	set_file(file);
 }
 
 void File::set_file(std::string file)
 {
 	_file = file;
+	_out.close();
+	_out.open(_file.c_str(), std::ios_base::app);
+	_in.close();
+	_in.open(_file.c_str());
 	return;
 }
 
