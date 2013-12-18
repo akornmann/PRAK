@@ -22,5 +22,6 @@ int main(int argc, const char* argv[])
 
 	Server s(port);
 	s.connect();
+
 	return 0;
 }

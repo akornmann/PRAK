@@ -18,7 +18,7 @@ class File
 	std::string currentTime();
 
 	void set_file(std::string file);
-
+	std::string file() const { return _file; };
 	int size();
  private :
 	std::string _file;

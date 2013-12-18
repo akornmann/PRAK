@@ -117,6 +117,7 @@ bool Server::receive(int s)
 	_r = recvfrom(s,&buffer,DGSIZE,0,(struct sockaddr*) &temp_addr, &temp_len);
 	AddrStorage* addr = new AddrStorage((struct sockaddr*) &temp_addr, s, _log);
 
+	update_client_map(addr);
 	return process(&buffer,addr);
 }
 
@@ -216,4 +217,16 @@ bool Server::process(Datagram* dg, AddrStorage* addr)
 	}
 
 	return res;
+}
+
+bool Server::update_client_map(AddrStorage* addr)
+{
+	addr_map::const_iterator it = _client_map.find(*addr);
+	if(it == _client_map.end())
+	{
+		State new_state;
+		_client_map[*addr] = new_state;
+	}
+
+	return true;
 }

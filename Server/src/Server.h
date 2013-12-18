@@ -9,6 +9,8 @@
 #include "File.h"
 #include "AddrStorage.h"
 #include "Converter.h"
+#include "State.h"
+#include "addr_map.h"
 
 using namespace std;
 
@@ -25,6 +27,8 @@ class Server
 
 	struct addrinfo _local, *_iterator, *_start;
 
+	addr_map _client_map;
+	
 	File _curr;
 
  public :
@@ -49,4 +53,5 @@ class Server
 	
 	//Surcouche serveur
 	bool process(Datagram* dg, AddrStorage* addr);
+	bool update_client_map(AddrStorage* addr);
 };

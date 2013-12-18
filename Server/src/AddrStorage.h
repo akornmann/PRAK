@@ -33,8 +33,8 @@ class AddrStorage
 	int family();
 	struct sockaddr* sockaddr();
 	socklen_t len();
-	string paddr();
-	string pport();
+	string paddr() const;
+	string pport() const;
 	int socket();
 	void socket(int s);
 

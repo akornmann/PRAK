@@ -83,12 +83,12 @@ socklen_t AddrStorage::len()
 	return  _len;
 }
 
-string AddrStorage::paddr()
+string AddrStorage::paddr() const
 {
 	return _p_addr;
 }
 
-string AddrStorage::pport()
+string AddrStorage::pport() const
 {
 	return _p_port;
 }
