@@ -1,16 +1,34 @@
-#include "State.h"
+#include "State.hpp"
 
-ostream& operator<<(ostream& os, const State& s)
+State::State():_status(DISCONNECT)
+{
+}
+
+State::State(Status s):_status(s)
+{
+}
+
+State::~State()
+{
+}
+
+ostream& operator<<(ostream& os, const State &s)
 {
 	string status;
 	switch(s._status)
 	{
 	case CONNECT :
 		status = "Connect";
+		break;
 	case DISCONNECT :
 		status = "Disconnect";
+		break;
 	case ACTIVE :
-		status = "Active : " + s._file->file();
+		status = "Active";
+		break;
+	default :
+		status = "Unknow status";
+		break;
 	}
-	return os << status << endl;
+	return os << status;
 }

@@ -1,8 +1,8 @@
 #ifndef SHELL
 #define SHELL
 
-#include "socket.h"
-#include "Client.h"
+#include "socket.hpp"
+#include "Client.hpp"
 
 class Shell
 {
@@ -13,15 +13,12 @@ class Shell
  private :
 	void wait_command();
 
-	void close();
-	void disconnect();
-	void status();
-	void connect(vector<string> cmd);
-	void error();
 	void fail();
+	void close();
+	void connect(vector<string> cmd);
 	void file(vector<string> cmd);
-
-	Client c;
+	void error();
+	Client *_c;
 };
 
 

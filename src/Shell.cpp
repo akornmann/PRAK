@@ -1,8 +1,10 @@
-#include "Shell.h"
+#include "Shell.hpp"
 
 Shell::Shell()
 {
 	system("clear");
+	string file = "server.cfg";
+	_c = new Client(file);
 	wait_command();
 }
 
@@ -23,10 +25,9 @@ void Shell::wait_command()
 	string ask = v[0];
 
 	if(ask == "exit") close();
-	else if(ask == "status") status();
 	else if(ask == "connect") connect(v);
-	else if(ask == "disconnect") disconnect();
 	else if(ask == "dl") file(v);
+	else if(ask == "error") error();
 	else fail();
 
 	wait_command();
@@ -34,22 +35,9 @@ void Shell::wait_command()
 
 void Shell::close()
 {
+	delete _c;
 	cout << "Goodbye !" << endl;
 	exit(true);
-	return;
-}
-
-void Shell::status()
-{
-	string s = c.status();
-	cout << s << endl;
-	return;
-}
-
-void Shell::error()
-{
-	string e = c.error();
-	cout << e << endl;
 	return;
 }
 
@@ -61,49 +49,56 @@ void Shell::fail()
 
 void Shell::connect(vector<string> cmd)
 {
+	string file;
 	switch(cmd.size())
 	{
 	case 1 :
 		cout << "Connecting with default configuration file" << endl;
-		c.server_select();
+		delete _c;
+		
+		file = "server.cfg";
+		_c = new Client(file);
+		AddrStorage *addr;
+		_c->synchronize(addr);
+		//cout << "Server : " << *addr << endl;
 		break;
 	case 2 :
 		cout << "Connecting with custom configuration file" << endl;
-		c.set_conf(cmd[1]);
-		c.server_select();
-		break;
-	case 3 :
-		cout << "Connecting to a specified server" << endl;
+		delete _c;
+		
+		file = cmd[1];
+		_c = new Client(file);
 		break;
 	default :
 		fail();
 		break;
 	}
-	status();
-	return;
-}
 
-void Shell::disconnect()
-{
-	c.disconnect();
-	status();
 	return;
 }
 
 void Shell::file(vector<string> v)
 {
-	bool succes = false;
 	switch(v.size())
 	{
 	case 2 :
-		succes = c.get_file(v[1]);
+		_c->get_file(v[1]);
 		return;
 	default :
 		fail();
 		return;
 	}
-
-	if(!succes) error();
 	
+	return;
+}
+
+void Shell::error()
+{
+	exc error = _c->error();
+	exc::const_iterator it;
+	for(it=error.begin();it!=error.end();++it)
+	{
+		cout << it->what() << endl;
+	}
 	return;
 }

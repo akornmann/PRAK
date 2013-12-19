@@ -1,12 +1,11 @@
-#include "File.h"
-#include "socket.h"
+#include "File.hpp"
 
-File::File(const std::string file)
+File::File(std::string f)
 {
-	set_file(file);
+	file(f);
 }
 
-void File::set_file(std::string file)
+void File::file(std::string file)
 {
 	_file = file;
 	_out.close();
@@ -21,20 +20,10 @@ void File::write(const std::string &msg)
 	if(_out) _out << msg;
 }
 
-void File::write(const std::string &prefix, const std::string &msg)
-{
-	_out << currentTime() << " " << prefix << " : " << msg << std::endl;	
-}
-
-void File::write(const std::string &name, const std::string &prefix, const std::string &msg)
-{
-	_out << currentTime() << " (" << name << ") " << prefix << " : " << msg << std::endl;	
-}
-
 
 std::string File::read(int n)
 {
-	int lines = count();
+	int lines = line();
 	if(lines<n)
 	{
 		return "end";
@@ -68,7 +57,7 @@ char* File::readChar(int n)
 	return res;
 }
 
-int File::count()
+int File::line()
 {
 	_in.close();
 	_in.open(_file.c_str());
@@ -77,16 +66,6 @@ int File::count()
 
 	return lines;
 }
-
-std::string File::currentTime()
-{
-	time_t t = time(NULL);
- 
-	std::string time = ctime(&t);
-	
-	return time;
-}
-
 
 int File::size()
 {

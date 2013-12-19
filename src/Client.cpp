@@ -1,113 +1,146 @@
-#include "Client.h"
+#include "Client.hpp"
 
-string Client::status()
-{
-	string s = "";
-	switch(_status)
-	{
-	case CONNECT :
-		s = "You are connect to "+_server->paddr()+":"+_server->pport();
-		break;
-	case DISCONNECT :
-		s = "You are not connect to any server !";
-		break;
-	default  :
-		s = "You are in an unknow status !";
-		break;
-	}
-	return s;
-}
 
-bool Client::init(Datagram* dg, int code, int seq, string s)
+Client::Client(string &config)
 {
-	if(s.length()>=512)
+	File conf(config);
+	
+	int i = 1;
+	string line = "end";
+	string a,p;
+	
+	while((line = conf.read(i)) != "end")
 	{
-		_log->write("Client::init","Datagram overflow");
-		return false;
-	}
-	else
-	{
-		memset(dg,0,DGSIZE);
+		string delim = " ";
+		vector<string> v = Converter::split(line,delim);
+		string a = v[0];
+		string p = v[1];
 		
-		dg->code = code;
-		dg->seq = seq;
-		strcpy(dg->data,Converter::stocs(s));
-		return true;
+		AddrStorage addr(a,p);
+		State s(DISCONNECT);
+		
+		_server_map[addr] = s;
+
+		i++;
 	}
-}
 
-bool Client::init(Datagram* dg, int code, int seq)
-{
-	string s = "";
-	return init(dg, code, seq, s);
-}
-
-void Client::show(string prefix, Datagram* dg)
-{
-	cout << prefix << endl
-	     << "Code : " << dg->code << endl
-	     << " Seq : " << dg->seq << endl
-	     << "Data : " << dg->data << endl;
-
-		return;
-}
-
-Client::Client()
-{
-	_conf = new File("server.cfg");
-	_log = new File("/home/kalex/.log/PRAK/Client.log");
-
-	_status=DISCONNECT;
+	// Create socket listening IPv4
+	_sock_4 = socket(AF_INET, SOCK_DGRAM, 0);
+	//int o = 1 ;
+	//setsockopt(_sock_4, SOL_SOCKET, SO_BROADCAST, &o, sizeof o);
+	
+	// Create socket listening IPv6
+	_sock_6 = socket(AF_INET6, SOCK_DGRAM, 0);
 }
 
 Client::~Client()
-{
-	disconnect();
+{	
+	close(_sock_4);
+	close(_sock_6);
 }
 
-bool Client::connect(string addr, string port)
+int Client::sock(const AddrStorage &addr)
 {
-	_server = new AddrStorage(addr,port,-1,_log);
-
-	// Creation socket UDP
-	int s = socket(_server->family(), SOCK_DGRAM, 0);
-	
-	int o = 1 ;
-	setsockopt(s, SOL_SOCKET, SO_BROADCAST, &o, sizeof o);
-
-	_server->socket(s);
-
-	if(is_connect())
+	int res = -1;
+	switch(addr.family())
 	{
-		_status = CONNECT;
-		return true;
+	case AF_INET :
+		res = _sock_4;
+		break;
+	case AF_INET6 :
+		res = _sock_6;
+		break;
+	default :
+		_exc.push_back(Exception("Client::socket : Bad family definition.", __LINE__));
+		break;
 	}
-	else return false;
+	return res;
 }
 
-bool Client::disconnect()
+bool Client::connect(const AddrStorage &addr)
 {
-	_log->write("Client::disconnect","Socket "+Converter::itos(_server->socket())+" closed\n\n\n");
-	close(_server->socket());
-	free(_server);
-	_status = DISCONNECT;
-	return true;
+	Datagram dg(0,0,"connect using toctoc");
+	send_to(dg,addr);
+	if(dg.code==0&&dg.seq==1) return true;
+	else
+	{
+		_exc.push_back(Exception("Client::is_connect : Server answer's wrong.", __LINE__));
+		return false;
+	}
 }
 
-bool Client::send_to(Datagram* dg, AddrStorage* addr)
+bool Client::synchronize(AddrStorage *addr)
 {
-	_r = sendto(addr->socket(), dg, DGSIZE, 0, addr->sockaddr(), addr->len());
-	return (_r!=-1);
+	bool res = true;
+
+	//First, we disconnect client from every server
+	addr_map::iterator it;
+	for(it=_server_map.begin();it!=_server_map.end();++it)
+	{
+		switch((it->second).status())
+		{
+		case ACTIVE :
+			_exc.push_back(Exception("Client::synchronize : A connection with a server is still active.",__LINE__));
+			//LA FAUT PANIQUER
+			break;
+		case CONNECT :
+			(it->second).status(DISCONNECT);
+			break;
+		case DISCONNECT :
+			break;
+		default :
+			_exc.push_back(Exception("Client::synchronize : Unknow status.", __LINE__));
+			//LA FAUT CARREMENT PANIQUER
+			break;
+		}
+	}
+
+
+	AddrStorage addr2("127.0.0.1","5600");
+	Datagram dg2(0,0,"connect using toctoc");
+	send_to(dg2,addr2);
+	Datagram dg;
+	//Now, we send a "toctoc" packet to every server
+	int i = 0;
+	for(it=_server_map.begin();it!=_server_map.end();++it)
+	{
+		dg.init(0,0,"sync"+Converter::itos(i));
+		send_to(dg,it->first);
+		i++;
+	}
+
+	//First receive -> Winner server !
+	if(!receive(dg,addr))
+	{
+		_exc.push_back(Exception("Client::synchronize : No server answered.", __LINE__));
+		res = false;
+	}
+	
+	return res;
 }
 
-bool Client::receive_from(Datagram* dg, AddrStorage* addr)
+bool Client::send_to(const Datagram &dg, const AddrStorage &addr)
 {
+	cout << "send_to: " << dg << " " << addr <<  endl;
+	int r = sendto(sock(addr), &dg, sizeof(Datagram), 0, addr.sockaddr(), addr.len());
+	
+	if(r==-1)
+	{
+		_exc.push_back(Exception("Client::send_to : Failed", __LINE__));
+		perror("send_to");
+		return false;
+	}
+	else return true;
+}
+
+bool Client::receive(Datagram &dg, AddrStorage *addr)
+{
+	bool res = false;
+
 	struct sockaddr_storage temp_addr;
 	socklen_t temp_len;
 	struct timeval time_val;
 	fd_set readfds;
-
-	int s = addr->socket();
 
 	temp_len = sizeof(struct sockaddr_storage);
 
@@ -115,24 +148,74 @@ bool Client::receive_from(Datagram* dg, AddrStorage* addr)
 	time_val.tv_usec = 0;
 
 	FD_ZERO(&readfds);
-	FD_SET(addr->socket(), &readfds);
-
-	if(select(s+1, &readfds, NULL, NULL, &time_val))
+	FD_SET(_sock_4,&readfds);
+	FD_SET(_sock_6,&readfds);
+	
+	int max = (_sock_4<_sock_6) ? _sock_6 : _sock_4;
+	if(select(max+1, &readfds, NULL, NULL, &time_val))
 	{
-		init(dg,0,0);
-		_r = recvfrom(s, dg, DGSIZE, 0, (struct sockaddr*) &temp_addr, &temp_len);
-
-		addr = new AddrStorage((struct sockaddr*) &temp_addr,s, _log);
-
-		return (_r!=-1);		
+		int r,s;
+		if(FD_ISSET(_sock_6,&readfds))
+		{
+			r = recvfrom(_sock_6, &dg, sizeof(Datagram), 0, (struct sockaddr*) &temp_addr, &temp_len);
+			s = _sock_6;
+		}
+		else if(FD_ISSET(_sock_4,&readfds))
+		{
+			r = recvfrom(_sock_4, &dg, sizeof(Datagram), 0, (struct sockaddr*) &temp_addr, &temp_len);
+			s = _sock_4;
+		}
+		else r = -1;
+			
+		if(r!=-1) 
+		{
+			addr = new AddrStorage((struct sockaddr*) &temp_addr,s);
+			res = true;
+		}
+		else _exc.push_back(Exception("Client::received : Failed.", __LINE__));
 	}
-	else
-	{
-		_log->write("Client::receive_from","Timer expired");
-		return false;
-	}
+	else _exc.push_back(Exception("Client::receive : Timer expired.", __LINE__));
+
+	return res;
 }
 
+bool Client::receive_from(Datagram &dg, const AddrStorage &addr)
+{
+	bool res = false;
+
+	struct sockaddr_storage temp_addr;
+	socklen_t temp_len;
+	struct timeval time_val;
+	fd_set readfds;
+
+	int s = sock(addr);
+
+	temp_len = sizeof(struct sockaddr_storage);
+
+	time_val.tv_sec = 1;
+	time_val.tv_usec = 0;
+
+	FD_ZERO(&readfds);
+	FD_SET(sock(addr), &readfds);
+	
+	if(select(s+1, &readfds, NULL, NULL, &time_val))
+	{
+		int r = recvfrom(s, &dg, sizeof(Datagram), 0, (struct sockaddr*) &temp_addr, &temp_len);
+		
+		Equal e;
+		AddrStorage incoming((struct sockaddr*) &temp_addr,s);
+		if(e(addr,incoming))
+		{
+			if(r!=-1) res = true;
+			else _exc.push_back(Exception("Client::receive_from : Failed.", __LINE__));
+		}
+		else _exc.push_back(Exception("Client::receive_from : Packet coming from wrong server.", __LINE__));
+		
+	}
+	else _exc.push_back(Exception("Client::receive_from : Timer expired.", __LINE__));
+
+	return res;
+}
 
 /*
  *
@@ -141,23 +224,21 @@ bool Client::receive_from(Datagram* dg, AddrStorage* addr)
  *
  */
 
-bool Client::toctoc(Datagram* dg, AddrStorage* addr)
+bool Client::toctoc(Datagram &dg, const AddrStorage &addr)
 {
-	dg->seq++;
-	return send_to(dg, addr);
+	dg.seq++;
+	return send_to(dg,addr);
 }
 
 
-bool Client::get_file(string file, AddrStorage* addr)
+bool Client::get_file(const string &file, const AddrStorage &addr)
 {
-	bool error = false;
-	Datagram s;
-	init(&s,1,-1,file);
-	send_to(&s, addr);
+	bool succes = false;
+	Datagram s(1,-1,file);
+	send_to(s,addr);
 
-	Datagram r;
-	init(&r,0,0);
-	if(receive_from(&r, addr))
+	Datagram r(0,0);
+	if(receive_from(r,addr))
 	{
 		if(r.code == 1)
 		{
@@ -170,12 +251,12 @@ bool Client::get_file(string file, AddrStorage* addr)
 				res[size-1] = 'x';
 			
 				int packet_number = ceil((float) size / (float) (DATASIZE-1));
-				init(&s,1,0,"Ready to receive");
-				send_to(&s, addr);
+				Datagram p(1,0,"Ready to receive");
+				send_to(p, addr);
 				
 				
 				
-				while(receive_from(&r, addr))
+				while(receive_from(r,addr))
 				{
 					if(r.seq%(DATASIZE-1)==0)
 					{
@@ -196,30 +277,17 @@ bool Client::get_file(string file, AddrStorage* addr)
 					}
 				}
 
-
 				cout  << res << endl;
-			}
-			else
-			{
-				_log->write("Client::get_file","Server does not find file "+file+" or he is empty");
-				_error = "File doesn't exist or is empty.";	
-			}
-		
-		}
-		else
-		{
-			_log->write("Client::get_file","Server does not find file "+file);
-			_error = "File not found.";
-		}
-	}
-	else
-	{
-		_log->write("Client::get_file","Server does not answer");
-		_error = "No answer.";
-	}
 
+				succes = true;
+			}
+			else _exc.push_back(Exception("Client::get_file : Server doesn't find this file, or this file's empty.", __LINE__));		
+		}
+		else _exc.push_back(Exception("Client::_get_file : Server doesn't find this file.", __LINE__));
+	}
+	else _exc.push_back(Exception("Client::get_file : Server didn't answer", __LINE__));
 
-	return error;
+	return succes;
 }
 
 /*
@@ -229,67 +297,17 @@ bool Client::get_file(string file, AddrStorage* addr)
  *
  */
 
-bool Client::is_connect()
-{
-	Datagram dg;
-	init(&dg,0,0);
-
-	send_to(&dg, _server);
-
-	if(receive_from(&dg, _server))
-	{
-		if(dg.code==0&&dg.seq==1)
-		{
-			_log->write("Client::is_connect", "Server answer successfull");
-			return true;
-		}
-		else
-		{
-			_log->write("Client::is_connect", "Bad server answer");
-			return false;
-		}
-	}
-	else
-	{
-		_log->write("Client::is_connect", "No server answer");
-		return false;
-	}
-}
-
-bool Client::server_select()
-{
-	int i = 1;
-	bool found = false;
-	string line = "end";
-	string a,p;
-
-	while(!found && (line = _conf->read(i)) != "end")
-	{
-		string delim = " ";
-		vector<string> v = Converter::split(line,delim);
-		string a = v[0];
-		string p = v[1];
-		
-		_log->write("Client::select_server","Try to connect to server "+a+":"+p);
-		
-		found = connect(a,p);
-
-		if(!found) disconnect();
-		i++;
-	}
-	if(found) _log->write("Client::select_server","Server "+_server->paddr()+":"+_server->pport()+" selected");
-	else _log->write("Client::select_server","No server available");
-
-	return found;
-}
-
 bool Client::get_file(string file)
 {
-	//Trouver un serveur convenable
-	if(_status == DISCONNECT) server_select();
+	AddrStorage *addr; 
+	synchronize(addr);
+	bool res = get_file(file,*addr);
+	delete addr;
 
-	_status = ACTIVE;
-	get_file(file,_server);
-	_status = CONNECT;
-	return true;
+	return res;
+}
+
+exc Client::error()
+{
+	return _exc;
 }

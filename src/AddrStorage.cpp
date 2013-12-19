@@ -1,9 +1,7 @@
-#include "AddrStorage.h"
+#include "AddrStorage.hpp"
 
-AddrStorage::AddrStorage(struct sockaddr* addr, int s, File* log)
+AddrStorage::AddrStorage(struct sockaddr *addr, int s):_p_addr(""),_p_port(""),_socket(s)
 {
-	_log = log;
-	_socket = s;
 	_sockaddr = addr;
 	_family = addr->sa_family;
 	_len = sizeof *addr;
@@ -33,52 +31,98 @@ AddrStorage::AddrStorage(struct sockaddr* addr, int s, File* log)
 	_p_addr = Converter::cstos(paddr);
 }
 
-AddrStorage::AddrStorage(string addr, string port, int s, File* log)
+AddrStorage::AddrStorage(string addr, string port):_p_addr(addr),_p_port(port),_socket(-1)
 {
-	_log = log;
-	_socket = s;
+	struct sockaddr_in *addr_ipv4 = (struct sockaddr_in*) &_addr;
+	struct sockaddr_in6 *addr_ipv6 = (struct sockaddr_in6*) &_addr;
 
-	_p_port = port;
-	_p_addr = addr;
-
-	_addr_ipv4 = (struct sockaddr_in*) &_addr;
-	_addr_ipv6 = (struct sockaddr_in6*) &_addr;
 	
 	memset(&_addr,0,sizeof _addr);
 
 	_n_port = htons(Converter::stoi(_p_port));
 
 	const char* c_addr = _p_addr.c_str();
-	if(inet_pton(AF_INET6, c_addr, &_addr_ipv6->sin6_addr) == 1)
+	if(inet_pton(AF_INET6, c_addr, &addr_ipv6->sin6_addr) == 1)
 	{
 		_family = PF_INET6;
-		_addr_ipv6->sin6_family = AF_INET6;
-		_addr_ipv6->sin6_port = _n_port;
-		_len = sizeof *_addr_ipv6;
+		addr_ipv6->sin6_family = AF_INET6;
+		addr_ipv6->sin6_port = _n_port;
+		_len = sizeof *addr_ipv6;
 	}
-	else if(inet_pton(AF_INET,c_addr, &_addr_ipv4->sin_addr) == 1)
+	else if(inet_pton(AF_INET,c_addr, &addr_ipv4->sin_addr) == 1)
 	{
 		_family = PF_INET;
-		_addr_ipv4->sin_family = AF_INET;
-		_addr_ipv4->sin_port = _n_port;
-		_len = sizeof *_addr_ipv4;
+		addr_ipv4->sin_family = AF_INET;
+		addr_ipv4->sin_port = _n_port;
+		_len = sizeof *addr_ipv4;
 	}
-	else _log->write("AddrStorage","Format d'adresse inconnue ("+_p_port+":"+_p_addr+")");
+	else throw Exception("AddrStorage::AddrStorage : Format d'adresse inconnue", __LINE__);
 
 	_sockaddr = (struct sockaddr*) &_addr;
 }
 
-int AddrStorage::family()
+/*AddrStorage::AddrStorage(const AddrStorage &as)
+{
+	cout << "AS:copie" << endl;
+	
+	_addr = as._addr;
+	//memcpy(_sockaddr, as._sockaddr, sizeof(struct sockaddr));
+	_n_port = as._n_port;
+	
+	_len = as._len;
+	_family = as._family;
+
+	_p_addr = as._p_addr;
+	_p_port = as._p_port;
+
+	_socket = as._socket;
+	}*/
+
+AddrStorage & AddrStorage::operator=(const AddrStorage &as)
+{
+	cout << "AS:affectation" << endl;
+
+	if(this!=&as) //Prevent auto-copy
+	{
+		_addr = as._addr;
+		memcpy(_sockaddr, as._sockaddr, sizeof(struct sockaddr));
+		_n_port = as._n_port;
+	
+		_len = as._len;
+		_family = as._family;
+
+		_p_addr = as._p_addr;
+		_p_port = as._p_port;
+
+		_socket = as._socket;
+	}
+
+	return *this;
+}
+
+AddrStorage::~AddrStorage()
+{
+	cout << "AS:destructeur" << endl;
+}
+
+
+
+void AddrStorage::sock(int s)
+{
+	_socket = s;
+}
+
+int AddrStorage::family() const
 {
 	return _family;
 }
 
-struct sockaddr* AddrStorage::sockaddr()
+struct sockaddr* AddrStorage::sockaddr() const
 {
 	return _sockaddr;
 }
 
-socklen_t AddrStorage::len()
+socklen_t AddrStorage::len() const
 {
 	return  _len;
 }
@@ -93,19 +137,12 @@ string AddrStorage::pport() const
 	return _p_port;
 }
 
-int AddrStorage::socket()
+int AddrStorage::sock() const
 {
 	return _socket;
 }
 
-void AddrStorage::socket(int s)
+ostream & operator<<(ostream &os, const AddrStorage &addr)
 {
-	_socket = s;
-}
-
-
-void AddrStorage::show()
-{
-	cout << "Adresse IP : " << paddr() << endl
-	     << "  Port UDP : " << pport() << endl;
+	return os << addr._p_addr << ":" << addr._p_port;
 }

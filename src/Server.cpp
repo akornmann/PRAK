@@ -1,130 +1,115 @@
-#include "Server.h"
+#include "Server.hpp"
 
-bool Server::init(Datagram* dg, int code, int seq, string s)
+Server::Server(string port):_run(true)
 {
-	if(s.length()>=512)
-	{
-		_log->write("Client::init","Datagram overflow");
-		return false;
-	}
-	else
-	{
-		memset(dg,0,DGSIZE);
-		
-		dg->code = code;
-		dg->seq = seq;
-		strcpy(dg->data,Converter::stocs(s));
-		return true;
-	}
-}
-
-bool Server::init(Datagram* dg, int code, int seq)
-{
-	string s = "";
-	return init(dg, code, seq, s);
-}
-
-void Server::show(string prefix, Datagram* dg)
-{
-	cout << prefix << endl
-	     << "Code : " << dg->code << endl
-	     << " Seq : " << dg->seq << endl
-	     << "Data : " << dg->data << endl;
-
-		return;
-}
-
-Server::Server(string port)
-{
-	_log = new File("/home/kalex/.log/PRAK/Server.log");
-
-	_port = port;
-	memset(&_local,0,sizeof _local);
-	_local.ai_family = PF_UNSPEC;
-	_local.ai_socktype = SOCK_DGRAM;
-	_local.ai_flags = AI_PASSIVE;
-	_r = getaddrinfo(NULL,_port.c_str(),&_local,&_start);
+	//We look every interfaces we can use
+	struct addrinfo local, *iterator, *start;
+	
+	memset(&local,0,sizeof(struct addrinfo));
+	local.ai_family = PF_UNSPEC;
+	local.ai_socktype = SOCK_DGRAM;
+	local.ai_flags = AI_PASSIVE;
+	int r = getaddrinfo(NULL,port.c_str(),&local,&start);
 	_n_socks = 0;
 
-	_log->write("Server::Server","Server started");
+	for(iterator=start;iterator&&_n_socks<MAXSOCK;iterator=iterator->ai_next)
+	{
+		_sockets[_n_socks] = socket(iterator->ai_family,iterator->ai_socktype,iterator->ai_protocol);
+		if(_sockets[_n_socks] != -1)
+		{
+			r = bind(_sockets[_n_socks],iterator->ai_addr,iterator->ai_addrlen);
+			if(r != -1) _n_socks++;
+			else _exc.push_back(Exception("Server::Server : Bind failed.", __LINE__));
+		}
+		else _exc.push_back(Exception("Server::Server : socket failed.", __LINE__));
+	}
+	
+	freeaddrinfo(start);
+
+	run();
 }
 
 Server::~Server()
 {
-	disconnect();
-	_log->write("Server::Server","Server stoped");
-}
-
-bool Server::connect()
-{
-	for(_iterator = _start; _iterator && _n_socks<MAXSOCK; _iterator = _iterator->ai_next)
-	{
-		_sockets[_n_socks] = socket(_iterator->ai_family,_iterator->ai_socktype,_iterator->ai_protocol);
-		if(_sockets[_n_socks] != -1)
-		{
-			_r = bind(_sockets[_n_socks],_iterator->ai_addr, _iterator->ai_addrlen);
-			if(_r != -1) _n_socks++;
-		}
-	}
-	
-	freeaddrinfo(_start);
-
-	while(1)
-	{
-		fd_set readfds;
-		int max = 0;
-		
-		FD_ZERO(&readfds);
-		for(int i = 0; i<_n_socks; i++)
-		{
-			FD_SET(_sockets[i], &readfds);
-			if(_sockets[i]>max) max = _sockets[i];
-		}
-		
-		select(max+1, &readfds, NULL, NULL, NULL);
-
-		for(int i = 0; i<_n_socks; i++)
-		{
-			if(FD_ISSET(_sockets[i], &readfds))
-			{
-				receive(_sockets[i]);
-			}
-		}
-
-	}
-
-	return true;
-}
-
-bool Server::disconnect()
-{
-	for(int i = 0; i<_n_socks; i++)
+	for(int i=0;i<_n_socks;i++)
 	{
 		close(_sockets[i]);
 	}
-	return true;
 }
 
-bool Server::receive(int s)
+int Server::sock(const AddrStorage &addr)
+{
+	return addr.sock();
+}
+
+void Server::run()
+{
+	//Initialization of socket descriptor
+	fd_set readfds;
+	int max = 0;
+		
+	FD_ZERO(&readfds);
+	for(int i=0;i<_n_socks;i++)
+	{
+		FD_SET(_sockets[i], &readfds);
+		if(_sockets[i]>max) max = _sockets[i];
+	}
+
+	Datagram dg;
+	AddrStorage *addr;
+	cout << "Server started" << endl;
+	//Start server (infinite loop)
+	while(_run)
+	{
+		if(select(max+1, &readfds, NULL, NULL, NULL)>0)
+		{
+			for(int i = 0; i<_n_socks; i++)
+			{
+				if(FD_ISSET(_sockets[i], &readfds))
+				{
+					addr->sock(_sockets[i]);
+					receive(dg,addr);
+					cout << dg << " on socket " << addr->sock() << endl;
+					//update_client_map(addr);
+					//process(dg,*addr);
+				}
+			}
+		}
+		else _exc.push_back(Exception("Server::server : select failed.",__LINE__));
+	}
+}
+
+bool Server::send_to(const Datagram &dg, const AddrStorage &addr)
+{
+	int r = sendto(sock(addr),&dg,sizeof(Datagram),0,addr.sockaddr(),addr.len());
+	
+	if(r!=-1) return true;
+	else
+	{
+		_exc.push_back(Exception("Server::send_to : sendto failed.",__LINE__));
+		return false;
+	}
+}
+
+bool Server::receive(Datagram &dg, AddrStorage *addr)
 {
 	struct sockaddr_storage temp_addr;
 	socklen_t temp_len;
 	temp_len = sizeof(struct sockaddr_storage);
+	int s = sock(*addr);
 
-	Datagram buffer;
-	memset(&buffer,0,DGSIZE);
+	int r = recvfrom(s,&dg,sizeof(Datagram),0,(struct sockaddr*) &temp_addr, &temp_len);
 	
-	_r = recvfrom(s,&buffer,DGSIZE,0,(struct sockaddr*) &temp_addr, &temp_len);
-	AddrStorage* addr = new AddrStorage((struct sockaddr*) &temp_addr, s, _log);
-
-	update_client_map(addr);
-	return process(&buffer,addr);
-}
-
-bool Server::send_to(Datagram* dg, AddrStorage* addr)
-{
-	_r = sendto(addr->socket(),dg, DGSIZE, 0, addr->sockaddr(), addr->len());
-	return true;
+	if(r!=-1)
+	{
+		addr = new AddrStorage((struct sockaddr*) &temp_addr,s);
+		return true;
+	}
+	else
+	{
+		_exc.push_back(Exception("Server::receive : recvfrom failed.", __LINE__));
+		return false;
+	}
 }
 
 
@@ -135,13 +120,13 @@ bool Server::send_to(Datagram* dg, AddrStorage* addr)
  *
  */
 
-bool Server::toctoc(Datagram* dg, AddrStorage* addr)
+bool Server::toctoc(Datagram &dg, const AddrStorage &addr)
 {
-	dg->seq++;
-	return send_to(dg, addr);
+	dg.seq++;
+	return send_to(dg,addr);
 }
 
-bool Server::send_file(Datagram* dg, AddrStorage* addr)
+bool Server::send_file(const Datagram &dg, const AddrStorage &addr)
 {
 	string file = "";
 	int end_size = 0, seq = 0, size = 0, packet_number = 0;
@@ -149,16 +134,15 @@ bool Server::send_file(Datagram* dg, AddrStorage* addr)
 	Datagram s;
 	char* buffer;
 	
-	switch(dg->seq)
+	switch(dg.seq)
 	{
 	case -1 :
 		//trouver le fichier local ou à l'exterieur !
-		file = dg->data;
-		_curr.set_file(file);
+		file = dg.data; //hidden cast
+		_curr.file(file);
 		size = _curr.size();
-		dg->seq = size;
-		
-		send_to(dg,addr);
+		s.init(0,size);
+		send_to(s,addr);
 		break;
 	case 0 :
 		packet_number = ceil((float) _curr.size()/ (float) (DATASIZE-1));
@@ -169,19 +153,17 @@ bool Server::send_file(Datagram* dg, AddrStorage* addr)
 			{
 				seq = i*(DATASIZE-1);
 				buffer = _curr.readChar(DATASIZE-1); //Buffer sera de taille DATASIZE (avec le \0 final)
-				init(&s,1,seq,Converter::cstos(buffer));
-				send_to(&s,addr);
+				s.init(1,seq,Converter::cstos(buffer));
+				send_to(s,addr);
 			}
 			else //C'est le paquet final
 			{
 				end_size = size-(i-1)*(DATASIZE-1);
 				buffer = _curr.readChar(end_size);
-				init(&s,1,size,Converter::cstos(buffer));
-				
-				send_to(&s,addr);
+				s.init(1,size,Converter::cstos(buffer));
+				send_to(s,addr);
 			}
 		}
-
 		break;
 		
 	default :
@@ -200,11 +182,11 @@ bool Server::send_file(Datagram* dg, AddrStorage* addr)
  *
  */
 
-bool Server::process(Datagram* dg, AddrStorage* addr)
+bool Server::process(Datagram &dg, const AddrStorage &addr)
 {
 	bool res = false;
 
-	switch(dg->code)
+	switch(dg.code)
 	{
 	case 0 :
 		res = toctoc(dg,addr);
@@ -219,13 +201,13 @@ bool Server::process(Datagram* dg, AddrStorage* addr)
 	return res;
 }
 
-bool Server::update_client_map(AddrStorage* addr)
+bool Server::update_client_map(const AddrStorage &addr)
 {
-	addr_map::const_iterator it = _client_map.find(*addr);
+	addr_map::const_iterator it = _client_map.find(addr);
 	if(it == _client_map.end())
 	{
-		State new_state;
-		_client_map[*addr] = new_state;
+		State new_state(CONNECT);
+		_client_map[addr] = new_state;
 	}
 
 	return true;

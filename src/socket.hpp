@@ -21,22 +21,4 @@
 
 #define MAXSOCK 5
 
-
-struct Datagram
-{
-	int code;
-	int seq;
-	char data[512];
-};
-
-#define DGSIZE 520
-#define DATASIZE 4
-
-enum Status
-{
-	CONNECT,
-	DISCONNECT,
-	ACTIVE,
-};
-
 #endif
