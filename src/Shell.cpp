@@ -50,6 +50,7 @@ void Shell::fail()
 void Shell::connect(vector<string> cmd)
 {
 	string file;
+	AddrStorage *addr = new AddrStorage();
 	switch(cmd.size())
 	{
 	case 1 :
@@ -58,7 +59,6 @@ void Shell::connect(vector<string> cmd)
 		
 		file = "server.cfg";
 		_c = new Client(file);
-		AddrStorage *addr;
 		_c->synchronize(addr);
 		//cout << "Server : " << *addr << endl;
 		break;

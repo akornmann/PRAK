@@ -96,17 +96,13 @@ bool Client::synchronize(AddrStorage *addr)
 	}
 
 
-	AddrStorage addr2("127.0.0.1","5600");
-	Datagram dg2(0,0,"connect using toctoc");
-	send_to(dg2,addr2);
+
 	Datagram dg;
 	//Now, we send a "toctoc" packet to every server
-	int i = 0;
 	for(it=_server_map.begin();it!=_server_map.end();++it)
 	{
-		dg.init(0,0,"sync"+Converter::itos(i));
+		dg.init(0,0,"sync");
 		send_to(dg,it->first);
-		i++;
 	}
 
 	//First receive -> Winner server !
@@ -116,18 +112,19 @@ bool Client::synchronize(AddrStorage *addr)
 		res = false;
 	}
 	
+	cout << "Winner is :" <<  dg << " from " << *addr << endl;
 	return res;
 }
 
 bool Client::send_to(const Datagram &dg, const AddrStorage &addr)
 {
-	cout << "send_to: " << dg << " " << addr <<  endl;
+	cout << "send_to : " << dg << " " << addr <<  endl;
 	int r = sendto(sock(addr), &dg, sizeof(Datagram), 0, addr.sockaddr(), addr.len());
 	
 	if(r==-1)
 	{
 		_exc.push_back(Exception("Client::send_to : Failed", __LINE__));
-		perror("send_to");
+		perror("errno : send_to ");
 		return false;
 	}
 	else return true;
@@ -137,7 +134,8 @@ bool Client::receive(Datagram &dg, AddrStorage *addr)
 {
 	bool res = false;
 
-	struct sockaddr_storage temp_addr;
+	//struct sockaddr_storage temp_addr;
+	struct sockaddr_storage *temp_addr = addr->storage();
 	socklen_t temp_len;
 	struct timeval time_val;
 	fd_set readfds;
@@ -157,19 +155,20 @@ bool Client::receive(Datagram &dg, AddrStorage *addr)
 		int r,s;
 		if(FD_ISSET(_sock_6,&readfds))
 		{
-			r = recvfrom(_sock_6, &dg, sizeof(Datagram), 0, (struct sockaddr*) &temp_addr, &temp_len);
+			r = recvfrom(_sock_6, &dg, sizeof(Datagram), 0, (struct sockaddr*) temp_addr, &temp_len);
 			s = _sock_6;
 		}
 		else if(FD_ISSET(_sock_4,&readfds))
 		{
-			r = recvfrom(_sock_4, &dg, sizeof(Datagram), 0, (struct sockaddr*) &temp_addr, &temp_len);
+			r = recvfrom(_sock_4, &dg, sizeof(Datagram), 0, (struct sockaddr*) temp_addr, &temp_len);
 			s = _sock_4;
 		}
 		else r = -1;
 			
 		if(r!=-1) 
 		{
-			addr = new AddrStorage((struct sockaddr*) &temp_addr,s);
+			addr->build(s);
+			cout << "receive : " << dg << " from " << *addr << endl;
 			res = true;
 		}
 		else _exc.push_back(Exception("Client::received : Failed.", __LINE__));
@@ -183,7 +182,7 @@ bool Client::receive_from(Datagram &dg, const AddrStorage &addr)
 {
 	bool res = false;
 
-	struct sockaddr_storage temp_addr;
+	//struct sockaddr_storage temp_addr;
 	socklen_t temp_len;
 	struct timeval time_val;
 	fd_set readfds;
@@ -200,10 +199,12 @@ bool Client::receive_from(Datagram &dg, const AddrStorage &addr)
 	
 	if(select(s+1, &readfds, NULL, NULL, &time_val))
 	{
+		AddrStorage incoming;
+		struct sockaddr_storage *temp_addr = incoming.storage();
 		int r = recvfrom(s, &dg, sizeof(Datagram), 0, (struct sockaddr*) &temp_addr, &temp_len);
 		
 		Equal e;
-		AddrStorage incoming((struct sockaddr*) &temp_addr,s);
+		incoming.build(s);
 		if(e(addr,incoming))
 		{
 			if(r!=-1) res = true;
@@ -299,7 +300,7 @@ bool Client::get_file(const string &file, const AddrStorage &addr)
 
 bool Client::get_file(string file)
 {
-	AddrStorage *addr; 
+	AddrStorage *addr = new AddrStorage(); 
 	synchronize(addr);
 	bool res = get_file(file,*addr);
 	delete addr;

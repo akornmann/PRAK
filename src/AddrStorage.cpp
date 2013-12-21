@@ -1,10 +1,61 @@
 #include "AddrStorage.hpp"
 
+AddrStorage::AddrStorage():_p_addr(""),_p_port("")
+{
+}
+
+void AddrStorage::build(int s)
+{
+	_socket = s;
+
+	_sockaddr = (struct sockaddr*) &_addr;
+
+	_family = _sockaddr->sa_family;
+	_len = sizeof(struct sockaddr);
+
+	struct in_addr* n_addr;
+	struct in6_addr* n_addr6;
+
+	char paddr[INET6_ADDRSTRLEN];
+	unsigned short port;
+
+	switch(_family)
+	{
+	case AF_INET :
+	        n_addr = &((struct sockaddr_in *) _sockaddr)->sin_addr;
+		port = ((struct sockaddr_in *) _sockaddr)->sin_port;
+		inet_ntop(_family, n_addr, paddr, INET_ADDRSTRLEN);
+		break ;
+	case AF_INET6 :
+		n_addr6 = &((struct sockaddr_in6 *) _sockaddr)->sin6_addr;
+		port = ((struct sockaddr_in6 *) _sockaddr)->sin6_port;
+		inet_ntop(_family, n_addr6, paddr, INET6_ADDRSTRLEN);
+		break ;
+	}
+	port = ntohs(port);
+
+	_p_port = Converter::itos(port);
+	_p_addr = Converter::cstos(paddr);
+	
+	//perror("build ");
+	//cout << "New AddrStorage (constructor 1) " << _p_addr << ":" << _p_port << endl;
+}
+
+/*
 AddrStorage::AddrStorage(struct sockaddr *addr, int s):_p_addr(""),_p_port(""),_socket(s)
 {
-	_sockaddr = addr;
-	_family = addr->sa_family;
-	_len = sizeof *addr;
+	memset(&_addr,0,sizeof(struct sockaddr_storage));
+
+	memcpy(&_addr, addr,sizeof(struct sockaddr));
+
+	_sockaddr = (struct sockaddr*) &_addr;
+
+	int m1 = memcmp(addr,_sockaddr, sizeof(struct sockaddr));
+	int m2 = memcmp(addr,_sockaddr, sizeof(struct sockaddr_storage));
+	cout << "Memory cpy : sockaddr " << m1 << " sockaddrstorage : " << m2 << endl;
+
+	_family = _sockaddr->sa_family;
+	_len = sizeof(struct sockaddr);
 
 	struct in_addr* n_addr;
 	struct in6_addr* n_addr6;
@@ -29,15 +80,17 @@ AddrStorage::AddrStorage(struct sockaddr *addr, int s):_p_addr(""),_p_port(""),_
 
 	_p_port = Converter::itos(port);
 	_p_addr = Converter::cstos(paddr);
+
 }
+*/
+
 
 AddrStorage::AddrStorage(string addr, string port):_p_addr(addr),_p_port(port),_socket(-1)
 {
 	struct sockaddr_in *addr_ipv4 = (struct sockaddr_in*) &_addr;
 	struct sockaddr_in6 *addr_ipv6 = (struct sockaddr_in6*) &_addr;
-
 	
-	memset(&_addr,0,sizeof _addr);
+	memset(&_addr,0,sizeof(struct sockaddr_storage));
 
 	_n_port = htons(Converter::stoi(_p_port));
 
@@ -59,14 +112,14 @@ AddrStorage::AddrStorage(string addr, string port):_p_addr(addr),_p_port(port),_
 	else throw Exception("AddrStorage::AddrStorage : Format d'adresse inconnue", __LINE__);
 
 	_sockaddr = (struct sockaddr*) &_addr;
+
+
+	//cout << "New AddrStorage (constructor 2) " << _p_addr << ":" << _p_port << endl;
 }
 
-/*AddrStorage::AddrStorage(const AddrStorage &as)
-{
-	cout << "AS:copie" << endl;
-	
+AddrStorage::AddrStorage(const AddrStorage &as)
+{	
 	_addr = as._addr;
-	//memcpy(_sockaddr, as._sockaddr, sizeof(struct sockaddr));
 	_n_port = as._n_port;
 	
 	_len = as._len;
@@ -76,16 +129,15 @@ AddrStorage::AddrStorage(string addr, string port):_p_addr(addr),_p_port(port),_
 	_p_port = as._p_port;
 
 	_socket = as._socket;
-	}*/
+
+	_sockaddr = (struct sockaddr*) &_addr;
+}
 
 AddrStorage & AddrStorage::operator=(const AddrStorage &as)
 {
-	cout << "AS:affectation" << endl;
-
 	if(this!=&as) //Prevent auto-copy
 	{
 		_addr = as._addr;
-		memcpy(_sockaddr, as._sockaddr, sizeof(struct sockaddr));
 		_n_port = as._n_port;
 	
 		_len = as._len;
@@ -95,6 +147,8 @@ AddrStorage & AddrStorage::operator=(const AddrStorage &as)
 		_p_port = as._p_port;
 
 		_socket = as._socket;
+
+		_sockaddr = (struct sockaddr*) &_addr;
 	}
 
 	return *this;
@@ -102,15 +156,8 @@ AddrStorage & AddrStorage::operator=(const AddrStorage &as)
 
 AddrStorage::~AddrStorage()
 {
-	cout << "AS:destructeur" << endl;
 }
 
-
-
-void AddrStorage::sock(int s)
-{
-	_socket = s;
-}
 
 int AddrStorage::family() const
 {
@@ -145,4 +192,10 @@ int AddrStorage::sock() const
 ostream & operator<<(ostream &os, const AddrStorage &addr)
 {
 	return os << addr._p_addr << ":" << addr._p_port;
+}
+
+
+struct sockaddr_storage * AddrStorage::storage()
+{
+	return &_addr;
 }

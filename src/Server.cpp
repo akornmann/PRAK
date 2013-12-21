@@ -18,7 +18,10 @@ Server::Server(string port):_run(true)
 		if(_sockets[_n_socks] != -1)
 		{
 			r = bind(_sockets[_n_socks],iterator->ai_addr,iterator->ai_addrlen);
-			if(r != -1) _n_socks++;
+			if(r != -1)
+			{
+				_n_socks++;
+			}
 			else _exc.push_back(Exception("Server::Server : Bind failed.", __LINE__));
 		}
 		else _exc.push_back(Exception("Server::Server : socket failed.", __LINE__));
@@ -55,9 +58,10 @@ void Server::run()
 		if(_sockets[i]>max) max = _sockets[i];
 	}
 
-	Datagram dg;
-	AddrStorage *addr;
+	Datagram dg;;
+
 	cout << "Server started" << endl;
+
 	//Start server (infinite loop)
 	while(_run)
 	{
@@ -67,11 +71,11 @@ void Server::run()
 			{
 				if(FD_ISSET(_sockets[i], &readfds))
 				{
-					addr->sock(_sockets[i]);
-					receive(dg,addr);
-					cout << dg << " on socket " << addr->sock() << endl;
-					//update_client_map(addr);
-					//process(dg,*addr);
+					AddrStorage *addr = new AddrStorage();
+					receive(dg,addr,_sockets[i]);
+					cout << dg << " from " << *addr << endl;
+					update_client_map(*addr);
+					process(dg,*addr);
 				}
 			}
 		}
@@ -91,18 +95,18 @@ bool Server::send_to(const Datagram &dg, const AddrStorage &addr)
 	}
 }
 
-bool Server::receive(Datagram &dg, AddrStorage *addr)
+bool Server::receive(Datagram &dg, AddrStorage *addr, int s)
 {
-	struct sockaddr_storage temp_addr;
+	struct sockaddr_storage *temp_addr = addr->storage();
+	//struct sockaddr_storage temp_addr;
 	socklen_t temp_len;
 	temp_len = sizeof(struct sockaddr_storage);
-	int s = sock(*addr);
 
-	int r = recvfrom(s,&dg,sizeof(Datagram),0,(struct sockaddr*) &temp_addr, &temp_len);
+	int r = recvfrom(s,&dg,sizeof(Datagram),0,(struct sockaddr*) temp_addr, &temp_len);
 	
 	if(r!=-1)
 	{
-		addr = new AddrStorage((struct sockaddr*) &temp_addr,s);
+		addr->build(s);
 		return true;
 	}
 	else

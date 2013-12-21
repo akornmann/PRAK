@@ -1,6 +1,8 @@
 #ifndef ADDRSTORAGE
 #define ADDRSTORAGE
 
+// TODO REVOIR SERVER SIDE CONSTRUCTOR
+
 #include "socket.hpp"
 #include "File.hpp"
 #include "Converter.hpp"
@@ -11,15 +13,17 @@ using namespace std;
 class AddrStorage
 {
  public :
-	AddrStorage(struct sockaddr *addr, int s); //From Server side : client address
+	AddrStorage(); //From Server side : client adress (part 1)
+	void build(int s); //From Server side : client address (part 2)
+
+	//AddrStorage(struct sockaddr *addr, int s); //From Server side : client address
 	AddrStorage(string addr, string port); //From Client side : server address
-	//AddrStorage(const AddrStorage &as); //copy constructor
+	AddrStorage(const AddrStorage &as); //copy constructor
 	AddrStorage & operator=(const AddrStorage &as); //assignement operator
 	~AddrStorage(); //destructor
 
-	//Setter
-	void sock(int s);
 	//Getter
+	struct sockaddr_storage * storage();
 	int sock() const;
 	string paddr() const;
 	string pport() const;

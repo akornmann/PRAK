@@ -28,7 +28,7 @@ class Server
 	
 	//Envoi/reception de datagrammes
 	bool send_to(const Datagram &dg, const AddrStorage &addr);
-	bool receive(Datagram &dg, AddrStorage *addr);
+	bool receive(Datagram &dg, AddrStorage *addr, int s);
 
 	//Protocole de base
 	bool toctoc(Datagram &dg, const AddrStorage &addr);

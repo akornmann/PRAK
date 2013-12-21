@@ -12,7 +12,7 @@ all: $(EXEC)
 
 $(EXEC): $(OBJS)
 	$(CXX) $(CFLAGS) -o $@ $^
-	mv *.o bin
+	mv *.o bin/
 	cp src/server.cfg bin
 %.o: %.cpp
 	$(CXX) $(CFLAGS) -o $@ -c $<
