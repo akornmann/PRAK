@@ -8,11 +8,23 @@ File::File(std::string f)
 void File::file(std::string file)
 {
 	_file = file;
-	_out.close();
+	open();
+	return;
+}
+
+void File::open()
+{
+	close();
+
 	_out.open(_file.c_str(), std::ios_base::app);
-	_in.close();
 	_in.open(_file.c_str());
 	return;
+}
+
+void File::close()
+{
+	_out.close();
+	_in.close();
 }
 
 void File::write(const std::string &msg)
@@ -30,8 +42,9 @@ std::string File::read(int n)
 	}
 	else
 	{
-		_in.close();
-		_in.open(_file.c_str());
+		close();
+		open();
+
 		char buffer[1024];
 		int i = 0;
 		if(_in)
@@ -40,8 +53,7 @@ std::string File::read(int n)
 			std::string res(buffer);	
 			return res;
 		}
-		else return "end";
-		
+		else return "end";	
 	}
 }
 
@@ -59,8 +71,8 @@ char* File::readChar(int n)
 
 int File::line()
 {
-	_in.close();
-	_in.open(_file.c_str());
+	close();
+	open();
 	int lines = 0;
 	if(_in) while(_in.ignore(100, '\n')) ++lines;
 

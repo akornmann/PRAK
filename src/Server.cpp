@@ -134,38 +134,45 @@ bool Server::toctoc(Datagram &dg, const AddrStorage &addr)
 
 bool Server::send_file(const Datagram &dg, const AddrStorage &addr)
 {
-	string file = "";
+	string new_file = "", file = "";
 	int end_size = 0, seq = 0, size = 0, packet_number = 0;
 
 	Datagram s;
+
 	char* buffer;
-	
+	State *current = &_client_map[addr];
+	File *f = new File();
+
 	switch(dg.seq)
 	{
 	case -1 :
 		//trouver le fichier local ou à l'exterieur !
-		file = dg.data; //hidden cast
-		_curr.file(file);
-		size = _curr.size();
+		new_file = dg.data; //hidden cast
+		current->file(new_file);
+		f->file(new_file);
+		size = f->size();
+
 		s.init(1,size);
 		send_to(s,addr);
 		break;
 	case 0 :
-		packet_number = ceil((float) _curr.size()/ (float) (DATASIZE-1));
-		size = _curr.size();
+		f->file(current->file()); //Open the right file
+		size = f->size();
+
+		packet_number = ceil((float) size/ (float) (DATASIZE-1));
 		for(int i=1;i<=packet_number;i++)
 		{
 			if(i*(DATASIZE-1)<=size) //C'est un paquet intermediaire, data est complet.
 			{
 				seq = i*(DATASIZE-1);
-				buffer = _curr.readChar(DATASIZE-1); //Buffer sera de taille DATASIZE (avec le \0 final)
+				buffer = f->readChar(DATASIZE-1); //Buffer sera de taille DATASIZE (avec le \0 final)
 				s.init(1,seq,Converter::cstos(buffer));
 				send_to(s,addr);
 			}
 			else //C'est le paquet final
 			{
 				end_size = size-(i-1)*(DATASIZE-1);
-				buffer = _curr.readChar(end_size);
+				buffer = f->readChar(end_size);
 				s.init(1,size,Converter::cstos(buffer));
 				send_to(s,addr);
 			}
@@ -212,7 +219,7 @@ bool Server::update_client_map(const AddrStorage &addr)
 	addr_map::const_iterator it = _client_map.find(addr);
 	if(it == _client_map.end())
 	{
-		State new_state(CONNECT);
+		State new_state(CONNECT,CLIENT);
 		_client_map[addr] = new_state;
 	}
 

@@ -10,6 +10,9 @@ class File
  public :
 	File() {};
 	File(std::string f);
+
+	void open();
+	void close();
 	//Ecriture dans le fichier
 	void write(const std::string &msg);
 	

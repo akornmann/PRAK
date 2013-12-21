@@ -5,11 +5,6 @@
 #include "File.hpp"
 
 
-#define CLIENT false;
-#define SERVER true;
-
-typedef bool CS;
-
 using namespace std;
 
 enum Status
@@ -19,19 +14,33 @@ enum Status
 	ACTIVE,
 };
 
+enum CS
+{
+	CLIENT,
+	SERVER,
+};
+
 class State
 {
 public :
 	State();
+	State(CS cs);
 	State(Status s);
+	State(Status s, CS cs);
+	State(const State &s);
+	State & operator=(const State &s);
 	~State();
-	Status status() const { return _status; };
-	void status(Status s) { _status = s; };
+
+	Status status() const;
+	void status(Status s);
+	string file() const;
+	void file(string f);
 
 	friend ostream& operator<<(ostream& os, const State &s);
  private :
 	Status _status;
 	CS _cs;
+	string _file;
 };
 
 #endif

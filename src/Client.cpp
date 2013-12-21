@@ -17,7 +17,7 @@ Client::Client(string &config)
 		string p = v[1];
 		
 		AddrStorage addr(a,p);
-		State s(DISCONNECT);
+		State s(DISCONNECT,SERVER);
 		
 		_server_map[addr] = s;
 
