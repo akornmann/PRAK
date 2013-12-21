@@ -6,7 +6,6 @@
 #include "socket.hpp"
 #include "File.hpp"
 #include "Converter.hpp"
-#include "Exception.hpp"
 
 using namespace std;
 

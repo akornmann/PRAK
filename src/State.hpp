@@ -3,7 +3,7 @@
 
 #include "socket.hpp"
 #include "File.hpp"
-
+#include <vector>
 
 using namespace std;
 
@@ -12,6 +12,8 @@ enum Status
 	CONNECT,
 	DISCONNECT,
 	ACTIVE,
+	META,
+	DATA,
 };
 
 enum CS
@@ -27,20 +29,32 @@ public :
 	State(CS cs);
 	State(Status s);
 	State(Status s, CS cs);
-	State(const State &s);
-	State & operator=(const State &s);
+
 	~State();
 
-	Status status() const;
-	void status(Status s);
-	string file() const;
-	void file(string f);
+	bool is_meta();
+	bool is_data();
 
 	friend ostream& operator<<(ostream& os, const State &s);
- private :
+
 	Status _status;
+
 	CS _cs;
+
+	//PACKET RECEIVED
+	int _init_seq;
+	vector<bool> _received_packet;
+
+	//METADATA
+	int _size;
 	string _file;
+	string _title;
+
+	//DATA
+	char *_buffer;
+
+
+
 };
 
 #endif

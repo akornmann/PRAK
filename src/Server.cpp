@@ -1,6 +1,6 @@
 #include "Server.hpp"
 
-Server::Server(string port):_run(true)
+Server::Server(string port, string config):Client(config),_run(true)
 {
 	//We look every interfaces we can use
 	struct addrinfo local, *iterator, *start;
@@ -126,10 +126,18 @@ bool Server::receive(Datagram &dg, AddrStorage *addr, int s)
  *
  */
 
-bool Server::toctoc(Datagram &dg, const AddrStorage &addr)
+bool Server::connect_ack(const Datagram &dg, const AddrStorage &addr)
 {
-	dg.seq++;
-	return send_to(dg,addr);
+	Datagram s(CONNECTRA, dg.seq+1, "Hey pretty client !");
+	_client_map[addr]._status = CONNECT;
+	return send_to(s,addr);
+}
+
+bool Server::disconnect_ack(const Datagram &dg, const AddrStorage &addr)
+{
+	Datagram s(DISCONNECTRA, dg.seq-1, "Bye lovely client !");
+	_client_map[addr]._status = DISCONNECT;
+	return send_to(s,addr);
 }
 
 bool Server::send_file(const Datagram &dg, const AddrStorage &addr)
@@ -148,7 +156,7 @@ bool Server::send_file(const Datagram &dg, const AddrStorage &addr)
 	case -1 :
 		//trouver le fichier local ou à l'exterieur !
 		new_file = dg.data; //hidden cast
-		current->file(new_file);
+		current->_file = new_file;
 		f->file(new_file);
 		size = f->size();
 
@@ -156,20 +164,20 @@ bool Server::send_file(const Datagram &dg, const AddrStorage &addr)
 		send_to(s,addr);
 		break;
 	case 0 :
-		f->file(current->file()); //Open the right file
+		f->file(current->_file);
 		size = f->size();
 
 		packet_number = ceil((float) size/ (float) (DATASIZE-1));
 		for(int i=1;i<=packet_number;i++)
 		{
-			if(i*(DATASIZE-1)<=size) //C'est un paquet intermediaire, data est complet.
+			if(i*(DATASIZE-1)<=size)
 			{
 				seq = i*(DATASIZE-1);
-				buffer = f->readChar(DATASIZE-1); //Buffer sera de taille DATASIZE (avec le \0 final)
+				buffer = f->readChar(DATASIZE-1);
 				s.init(1,seq,Converter::cstos(buffer));
 				send_to(s,addr);
 			}
-			else //C'est le paquet final
+			else
 			{
 				end_size = size-(i-1)*(DATASIZE-1);
 				buffer = f->readChar(end_size);
@@ -186,6 +194,93 @@ bool Server::send_file(const Datagram &dg, const AddrStorage &addr)
 	}
 
 	return true;
+
+
+	//PROTOCOLE A AMELIORER !!!
+	//VERIFICATION PAS DE PERTE DE PAQUETS
+}
+
+bool Server::get_file(const Datagram &dg, const AddrStorage &addr)
+{
+	int i, init, size, packet_number, current_packet;
+	Datagram asw;
+
+	State *current = &_client_map[addr];
+	File *f;
+
+	switch(current->_status)
+	{
+	case CONNECT :
+		asw.init(UPLOAD,dg.seq,"I'm ready !");
+		send_to(asw,addr);
+		current->_init_seq = dg.seq;
+		current->_status = META;
+		break;
+
+	case META :
+		if(dg.seq==-2)
+		{
+			current->_file = dg.data;
+			remove_file(current->_file);
+		}
+		if(dg.seq==-1) current->_title = dg.data;
+		if(dg.seq>0)
+		{
+			current->_size = dg.seq;
+			current->_buffer = new char[dg.seq];
+			packet_number = ceil((float) current->_size/(float) (DATASIZE-1));
+			current->_received_packet.resize(packet_number,false);
+		}
+
+		if(current->is_meta())
+		{
+			asw.init(UPLOAD,0,"Metas are nice.");
+			send_to(asw,addr);
+			current->_status = DATA;
+		}
+		break;
+
+	case DATA :
+		size = current->_size;
+		packet_number = ceil((float) size/(float) (DATASIZE-1));
+		if(dg.seq%(DATASIZE-1)==0)
+		{
+			init = dg.seq-(DATASIZE-1);
+			current_packet = dg.seq/(DATASIZE-1);
+		}
+		else
+		{
+			init = dg.seq-(size-(packet_number-1)*(DATASIZE-1));
+			current_packet = packet_number-1;
+		}
+
+		for(i=init;i<=dg.seq;i++)
+		{
+			current->_buffer[i] = dg.data[i-init];
+		}
+		current->_received_packet[current_packet] = true;
+		
+		asw.init(UPLOAD,dg.seq,"Ack");
+		send_to(asw,addr);
+
+		if(current->is_data())
+		{
+			current->_received_packet.resize(0);
+			current->_status = DISCONNECT;
+			f = new File(current->_file);
+			f->write(Converter::cstos(current->_buffer));
+			current->_file = "";
+			current->_title = "";
+			current->_size = 0;
+			delete[] current->_buffer;
+			delete f;
+		}
+		break;
+
+	default :
+		break;
+	}
+	return true;
 }
 
 /*
@@ -195,17 +290,23 @@ bool Server::send_file(const Datagram &dg, const AddrStorage &addr)
  *
  */
 
-bool Server::process(Datagram &dg, const AddrStorage &addr)
+bool Server::process(const Datagram &dg, const AddrStorage &addr)
 {
 	bool res = false;
 
 	switch(dg.code)
 	{
-	case 0 :
-		res = toctoc(dg,addr);
+	case CONNECT :
+		res = connect_ack(dg,addr);
 		break;
-	case 1 :
+	case DISCONNECT :
+		res = disconnect_ack(dg,addr);
+		break;
+	case DOWNLOAD :
 		res = send_file(dg,addr);
+		break;
+	case UPLOAD :
+		res = get_file(dg,addr);
 		break;
 	default :
 		break;
@@ -219,9 +320,15 @@ bool Server::update_client_map(const AddrStorage &addr)
 	addr_map::const_iterator it = _client_map.find(addr);
 	if(it == _client_map.end())
 	{
-		State new_state(CONNECT,CLIENT);
+		State new_state(DISCONNECT,CLIENT);
 		_client_map[addr] = new_state;
 	}
 
 	return true;
+}
+
+bool Server::remove_file(const string &file)
+{
+	//penser a supprimer sur tout les serveurs
+	return remove(Converter::stocs(file));
 }

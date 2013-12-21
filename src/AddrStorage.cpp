@@ -109,7 +109,6 @@ AddrStorage::AddrStorage(string addr, string port):_p_addr(addr),_p_port(port),_
 		addr_ipv4->sin_port = _n_port;
 		_len = sizeof *addr_ipv4;
 	}
-	else throw Exception("AddrStorage::AddrStorage : Format d'adresse inconnue", __LINE__);
 
 	_sockaddr = (struct sockaddr*) &_addr;
 

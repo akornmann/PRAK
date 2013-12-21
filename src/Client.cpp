@@ -77,14 +77,14 @@ bool Client::synchronize(AddrStorage *addr)
 	addr_map::iterator it;
 	for(it=_server_map.begin();it!=_server_map.end();++it)
 	{
-		switch((it->second).status())
+		switch((it->second)._status)
 		{
 		case ACTIVE :
 			throw (Exception("Client::synchronize : A connection with a server is still active.",__LINE__));
 			//LA FAUT PANIQUER
 			break;
 		case CONNECT :
-			(it->second).status(DISCONNECT);
+			(it->second)._status = DISCONNECT;
 			break;
 		case DISCONNECT :
 			break;
@@ -98,11 +98,9 @@ bool Client::synchronize(AddrStorage *addr)
 
 
 	Datagram dg;
-	//Now, we send a "toctoc" packet to every server
 	for(it=_server_map.begin();it!=_server_map.end();++it)
 	{
-		dg.init(0,0,"sync");
-		send_to(dg,it->first);
+		connect_req(it->first);
 	}
 
 	//First receive -> Winner server !
@@ -110,6 +108,17 @@ bool Client::synchronize(AddrStorage *addr)
 	{
 		throw (Exception("Client::synchronize : No server answered.", __LINE__));
 		res = false;
+	}
+	else
+	{
+		_server_map[*addr]._status = CONNECT;
+
+		//Disconnect from other server
+		for(it=_server_map.begin();it!=_server_map.end();++it)
+		{
+			Equal e;
+			if(!e(it->first,*addr)) disconnect_req(it->first);
+		}
 	}
 	
 	return res;
@@ -236,17 +245,22 @@ bool Client::receive_from(Datagram &dg, const AddrStorage &addr)
  *
  */
 
-bool Client::toctoc(Datagram &dg, const AddrStorage &addr)
+bool Client::connect_req(const AddrStorage &addr)
 {
-	dg.seq++;
+	Datagram dg(CONNECTRA,0,"Is there any server here ?");
 	return send_to(dg,addr);
 }
 
+bool Client::disconnect_req(const AddrStorage &addr)
+{
+	Datagram dg(DISCONNECTRA,0,"It's time to leave.");
+	return send_to(dg,addr);
+}
 
 bool Client::get_file(const string &file, const AddrStorage &addr)
 {
 	bool succes = false;
-	Datagram s(1,-1,file);
+	Datagram s(DOWNLOAD,-1,file);
 	send_to(s,addr);
 
 	Datagram r(0,0);
@@ -303,6 +317,79 @@ bool Client::get_file(const string &file, const AddrStorage &addr)
 	return succes;
 }
 
+
+bool Client::send_file(const string &file, const string &title,const AddrStorage &addr)
+{	
+	if(file == "") throw Exception("Client::send_file : File name can't be empty",__LINE__);
+	File f(file);
+	int size = f.size();
+	if(size<=0) throw Exception("Client::send_file : This file doesn't exist !", __LINE__);
+	string trunc_title = title.substr(0,80); //truncate title to 80
+	   if(trunc_title == "") throw Exception("Client::send_file : Title can't be empty.", __LINE__);
+	Datagram rcv;
+	char* buffer;
+
+	//INITIATE TRANSFERT
+	int init_seq = 1; //never use 0 !!!
+	Datagram start(UPLOAD,init_seq,"Wake up lazzy server !");
+	
+	do
+	{
+		send_to(start,addr);
+		
+		receive_from(rcv,addr);
+	}
+	while(rcv.seq != init_seq);
+
+	//SENDING METADATA
+	Datagram meta_file(UPLOAD,-2,file);
+	Datagram meta_title(UPLOAD,-1,trunc_title);
+	Datagram meta_size(UPLOAD,size);
+
+	do
+	{
+		send_to(meta_file,addr);
+		send_to(meta_title,addr);
+		send_to(meta_size,addr);
+
+		receive_from(rcv,addr);
+	}
+	while(rcv.seq != 0);
+
+	//SENDING DATA
+	int packet_number = ceil((float) size/(float) (DATASIZE-1));
+	cout << "n packets : " << packet_number << endl;
+	for(int i=1;i<=packet_number;i++)
+	{
+		int seq, to_read;
+		if(i*(DATASIZE-1)<=size)
+		{
+			seq = i*(DATASIZE-1);
+			to_read = DATASIZE-1;
+		}
+		else
+		{
+			seq = size;
+			to_read = size-(i-1)*(DATASIZE-1);
+		}
+		
+		buffer = f.readChar(to_read);
+		Datagram up(UPLOAD,seq,Converter::cstos(buffer));
+
+		do
+		{
+			send_to(up,addr);
+			receive_from(rcv,addr);
+		}
+		while(rcv.seq!=seq);
+
+		delete[] buffer;
+	}
+
+	_server_map[addr]._status = DISCONNECT;
+	return true;
+}
+
 /*
  *
  * Surcouche client
@@ -315,6 +402,16 @@ bool Client::get_file(string file)
 	AddrStorage *addr = new AddrStorage(); 
 	synchronize(addr);
 	bool res = get_file(file,*addr);
+	delete addr;
+
+	return res;
+}
+
+bool Client::send_file(string file, string title)
+{
+	AddrStorage *addr = new AddrStorage();
+	synchronize(addr);
+	bool res = send_file(file,title,*addr);
 	delete addr;
 
 	return res;

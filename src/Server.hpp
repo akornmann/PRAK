@@ -1,28 +1,16 @@
-/*
- * Alexandre Kornmann
- * Projet reseau
- * Master 2 CSMI
- * Classe Server : gestion de la connexion avec les clients
- */
+#ifndef SERVER_H
+#define SERVER_H
 
-#include "socket.hpp"
-#include "File.hpp"
-#include "AddrStorage.hpp"
-#include "Converter.hpp"
-#include "State.hpp"
-#include "addr_map.hpp"
-#include "Datagram.hpp"
-#include "Exception.hpp"
-#include <vector>
+#include "Client.hpp"
 
 using namespace std;
 
-class Server
+class Server : public Client
 {
  public :
-	Server(string port);
+	Server(string port, string config);
 	~Server();
-	
+
 	int sock(const AddrStorage &addr);
 	void run();
 	
@@ -31,13 +19,15 @@ class Server
 	bool receive(Datagram &dg, AddrStorage *addr, int s);
 
 	//Protocole de base
-	bool toctoc(Datagram &dg, const AddrStorage &addr);
+	bool connect_ack(const Datagram &dg, const AddrStorage &addr);
+	bool disconnect_ack(const Datagram &dg, const AddrStorage &addr);
 	bool get_file(const Datagram &dg, const AddrStorage &addr);
 	bool send_file(const Datagram &dg, const AddrStorage &addr);
 	
 	//Surcouche serveur
-	bool process(Datagram &dg, const AddrStorage &addr);
+	bool process(const Datagram &dg, const AddrStorage &addr);
 	bool update_client_map(const AddrStorage &addr);
+	bool remove_file(const string &file);
 
  private :
 	int _sockets[MAXSOCK];
@@ -52,3 +42,5 @@ class Server
 	// Obsolete
 	File _curr;
 };
+
+#endif

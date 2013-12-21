@@ -1,22 +1,28 @@
 #ifndef EXCEPTION
 #define EXCEPTION
 
-#include "Converter.hpp"
 #include <iostream>
 #include <sstream>
 #include <exception>
- 
-class Exception : public std::exception
+
+#include "AddrStorage.hpp"
+#include "Converter.hpp"
+
+using namespace std;
+
+class Exception : public exception
 {
  public :
 	Exception(const string &str, int line);
+	Exception(const string &str, const AddrStorage &addr, int line);
 	virtual ~Exception() throw(){}
  
 	virtual const char * what() const throw();
  
  private:
-	std::string _exc;
+	string _exc;
 	int _line;
+	AddrStorage _addr;
 };
 
 #endif

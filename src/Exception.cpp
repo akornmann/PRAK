@@ -4,6 +4,14 @@ Exception::Exception(const string &str, int line)
 {
 	_exc = str;
 	_line = line;
+	_addr = AddrStorage();
+}
+
+Exception::Exception(const string &str, const AddrStorage &addr, int line)
+{
+	_exc = str;
+	_line = line;
+	_addr = addr;
 }
 
 const char * Exception::what() const throw()

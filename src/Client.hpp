@@ -1,21 +1,31 @@
-/*
- * Alexandre Kornmann
- * Projet reseau
- * Master 2 CSMI
- * Classe Client : gestion de la connexion avec le serveur
- */
+#ifndef CLIENT_H
+#define CLIENT_H
 
+//Usefull includes
 #include "socket.hpp"
-#include "addr_map.hpp"
 
-#include "AddrStorage.hpp"
-#include "File.hpp"
-#include "Datagram.hpp"
-#include "Exception.hpp"
-#include "State.hpp"
+//Data structures
+#include "addr_map.hpp"
 #include <vector>
 
+//Class
+#include "AddrStorage.hpp"
+#include "Converter.hpp"
+#include "Datagram.hpp"
+#include "Exception.hpp"
+#include "File.hpp"
+#include "State.hpp"
+
 using namespace std;
+
+enum Protocol
+{
+	CONNECTRA,
+	DISCONNECTRA,
+	DOWNLOAD,
+	UPLOAD,
+};
+
 
 typedef vector<Exception> exc;
 
@@ -35,13 +45,14 @@ class Client
 	bool receive_from(Datagram &dg, const AddrStorage &addr);
 
 	//Protocole de base
-	bool toctoc(Datagram &dg, const AddrStorage &addr);
+	bool connect_req(const AddrStorage &addr);
+	bool disconnect_req(const AddrStorage &addr);
 	bool get_file(const string &file, const AddrStorage &addr);
-	bool send_file(const string &file, const AddrStorage &addr);
+	bool send_file(const string &file, const string &title, const AddrStorage &addr);
 
 	//Surcouche client
 	bool get_file(string file);
-	bool send_file(string file);
+	bool send_file(string file, string title);
 
 	//Gestion erreurs
 	exc error();
@@ -54,3 +65,5 @@ class Client
 
 	exc _exc;
 };
+
+#endif

@@ -28,12 +28,14 @@ void Shell::wait_command()
 	{
 		if(ask == "exit") close();
 		else if(ask == "connect") connect(v);
-		else if(ask == "dl") file(v);
+		else if(ask == "dl" || ask == "lire") download(v);
+		else if(ask == "ul" || ask == "stocker") upload(v);
 		else if(ask == "error") error();
 		else fail();
 	}
 	catch(Exception e)
 	{
+		//DECONNEXION !!!
 		e.what();
 	}
 
@@ -83,12 +85,27 @@ void Shell::connect(vector<string> cmd)
 	return;
 }
 
-void Shell::file(vector<string> v)
+void Shell::download(vector<string> v)
 {
 	switch(v.size())
 	{
 	case 2 :
 		_c->get_file(v[1]);
+		return;
+	default :
+		fail();
+		return;
+	}
+	
+	return;
+}
+
+void Shell::upload(vector<string> v)
+{
+	switch(v.size())
+	{
+	case 3 :
+		_c->send_file(v[1],v[2]);
 		return;
 	default :
 		fail();

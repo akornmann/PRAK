@@ -1,62 +1,45 @@
 #include "State.hpp"
 
-State::State():_status(DISCONNECT),_cs(CLIENT)
+State::State():_status(DISCONNECT),_cs(CLIENT),_init_seq(0),_size(0),_file(""),_title("")
 {
 }
 
-State::State(CS cs):_status(DISCONNECT),_cs(cs)
+State::State(CS cs):_status(DISCONNECT),_cs(cs),_init_seq(0),_size(0),_file(""),_title("")
 {
 }
 
 
-State::State(Status s, CS cs):_status(s),_cs(cs)
+State::State(Status s, CS cs):_status(s),_cs(cs),_init_seq(0),_size(0),_file(""),_title("")
 {
-}
-
-State::State(const State &s)
-{
-	_status = s._status;
-	_cs = s._cs;
-	_file = s._file;
-}
-
-State & State::operator=(const State &s)
-{
-	if(this!=&s) //Prevent auto-copy
-	{
-		_status = s._status;
-		_cs = s._cs;
-		_file = s._file;	
-	}
-
-	return *this;
 }
 
 State::~State()
 {
 }
 
-Status State::status() const
+bool State::is_meta()
 {
-	return _status;
+	bool f = (_file != "");
+	bool t = (_title != "");
+	bool s = (_size>0);
+
+	return f&&t&&s;
 }
 
-void State::status(Status s)
+bool State::is_data()
 {
-	_status = s;
+	cout << "is data : ";
+	bool res = true;
+	vector<bool>::const_iterator it;
+	for(it=_received_packet.begin();it!=_received_packet.end();++it)
+	{
+		res = res && *it;
+		if(*it) cout << "1";
+		else cout << "0";
+	}
+	cout << endl;
+	return res;
 }
-
-string State::file() const
-{
-	return _file;
-}
-
-void State::file(string f)
-{
-	_status = ACTIVE;
-	_file = f;
-}
-
 
 ostream& operator<<(ostream& os, const State &s)
 {
