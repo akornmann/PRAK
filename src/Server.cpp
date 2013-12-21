@@ -60,8 +60,6 @@ void Server::run()
 
 	Datagram dg;;
 
-	cout << "Server started" << endl;
-
 	//Start server (infinite loop)
 	while(_run)
 	{
@@ -73,7 +71,6 @@ void Server::run()
 				{
 					AddrStorage *addr = new AddrStorage();
 					receive(dg,addr,_sockets[i]);
-					cout << dg << " from " << *addr << endl;
 					update_client_map(*addr);
 					process(dg,*addr);
 				}
@@ -87,7 +84,11 @@ bool Server::send_to(const Datagram &dg, const AddrStorage &addr)
 {
 	int r = sendto(sock(addr),&dg,sizeof(Datagram),0,addr.sockaddr(),addr.len());
 	
-	if(r!=-1) return true;
+	if(r!=-1) 
+	{
+		cout << dg << " to " << addr << endl;
+		return true;
+	}
 	else
 	{
 		_exc.push_back(Exception("Server::send_to : sendto failed.",__LINE__));
@@ -107,6 +108,7 @@ bool Server::receive(Datagram &dg, AddrStorage *addr, int s)
 	if(r!=-1)
 	{
 		addr->build(s);
+		cout << dg << " from " <<* addr << endl;
 		return true;
 	}
 	else
@@ -145,7 +147,7 @@ bool Server::send_file(const Datagram &dg, const AddrStorage &addr)
 		file = dg.data; //hidden cast
 		_curr.file(file);
 		size = _curr.size();
-		s.init(0,size);
+		s.init(1,size);
 		send_to(s,addr);
 		break;
 	case 0 :

@@ -24,11 +24,18 @@ void Shell::wait_command()
 
 	string ask = v[0];
 
-	if(ask == "exit") close();
-	else if(ask == "connect") connect(v);
-	else if(ask == "dl") file(v);
-	else if(ask == "error") error();
-	else fail();
+	try
+	{
+		if(ask == "exit") close();
+		else if(ask == "connect") connect(v);
+		else if(ask == "dl") file(v);
+		else if(ask == "error") error();
+		else fail();
+	}
+	catch(Exception e)
+	{
+		e.what();
+	}
 
 	wait_command();
 }
@@ -60,7 +67,6 @@ void Shell::connect(vector<string> cmd)
 		file = "server.cfg";
 		_c = new Client(file);
 		_c->synchronize(addr);
-		//cout << "Server : " << *addr << endl;
 		break;
 	case 2 :
 		cout << "Connecting with custom configuration file" << endl;

@@ -64,7 +64,7 @@ bool Client::connect(const AddrStorage &addr)
 	if(dg.code==0&&dg.seq==1) return true;
 	else
 	{
-		_exc.push_back(Exception("Client::is_connect : Server answer's wrong.", __LINE__));
+		throw (Exception("Client::is_connect : Server answer's wrong.", __LINE__));
 		return false;
 	}
 }
@@ -80,7 +80,7 @@ bool Client::synchronize(AddrStorage *addr)
 		switch((it->second).status())
 		{
 		case ACTIVE :
-			_exc.push_back(Exception("Client::synchronize : A connection with a server is still active.",__LINE__));
+			throw (Exception("Client::synchronize : A connection with a server is still active.",__LINE__));
 			//LA FAUT PANIQUER
 			break;
 		case CONNECT :
@@ -89,7 +89,7 @@ bool Client::synchronize(AddrStorage *addr)
 		case DISCONNECT :
 			break;
 		default :
-			_exc.push_back(Exception("Client::synchronize : Unknow status.", __LINE__));
+			throw (Exception("Client::synchronize : Unknow status.", __LINE__));
 			//LA FAUT CARREMENT PANIQUER
 			break;
 		}
@@ -108,26 +108,27 @@ bool Client::synchronize(AddrStorage *addr)
 	//First receive -> Winner server !
 	if(!receive(dg,addr))
 	{
-		_exc.push_back(Exception("Client::synchronize : No server answered.", __LINE__));
+		throw (Exception("Client::synchronize : No server answered.", __LINE__));
 		res = false;
 	}
 	
-	cout << "Winner is :" <<  dg << " from " << *addr << endl;
 	return res;
 }
 
 bool Client::send_to(const Datagram &dg, const AddrStorage &addr)
 {
-	cout << "send_to : " << dg << " " << addr <<  endl;
 	int r = sendto(sock(addr), &dg, sizeof(Datagram), 0, addr.sockaddr(), addr.len());
 	
 	if(r==-1)
 	{
-		_exc.push_back(Exception("Client::send_to : Failed", __LINE__));
-		perror("errno : send_to ");
+		throw (Exception("Client::send_to : Failed", __LINE__));
 		return false;
 	}
-	else return true;
+	else
+	{
+		cout << dg << " to " << addr << endl;
+		return true;
+	}
 }
 
 bool Client::receive(Datagram &dg, AddrStorage *addr)
@@ -168,13 +169,16 @@ bool Client::receive(Datagram &dg, AddrStorage *addr)
 		if(r!=-1) 
 		{
 			addr->build(s);
-			cout << "receive : " << dg << " from " << *addr << endl;
+			cout << dg << " from (new) " << *addr << endl;
 			res = true;
 		}
-		else _exc.push_back(Exception("Client::received : Failed.", __LINE__));
+		else throw (Exception("Client::received : Failed.", __LINE__));
 	}
-	else _exc.push_back(Exception("Client::receive : Timer expired.", __LINE__));
-
+	else
+	{
+		res = false;
+		_exc.push_back(Exception("Client::receive_from : Timer expired.", __LINE__));
+	}
 	return res;
 }
 
@@ -201,19 +205,26 @@ bool Client::receive_from(Datagram &dg, const AddrStorage &addr)
 	{
 		AddrStorage incoming;
 		struct sockaddr_storage *temp_addr = incoming.storage();
-		int r = recvfrom(s, &dg, sizeof(Datagram), 0, (struct sockaddr*) &temp_addr, &temp_len);
-		
-		Equal e;
+		int r = recvfrom(s, &dg, sizeof(Datagram), 0, (struct sockaddr*) temp_addr, &temp_len);
 		incoming.build(s);
+		Equal e;
 		if(e(addr,incoming))
 		{
-			if(r!=-1) res = true;
-			else _exc.push_back(Exception("Client::receive_from : Failed.", __LINE__));
+			if(r!=-1)
+			{
+				cout << dg << " from " << addr << endl;
+				res = true;
+			}
+			else throw (Exception("Client::receive_from : Failed.", __LINE__));
 		}
-		else _exc.push_back(Exception("Client::receive_from : Packet coming from wrong server.", __LINE__));
+		else throw (Exception("Client::receive_from : Packet coming from wrong server.", __LINE__));
 		
 	}
-	else _exc.push_back(Exception("Client::receive_from : Timer expired.", __LINE__));
+	else
+	{
+		res = false;
+		_exc.push_back(Exception("Client::receive_from : Timer expired.", __LINE__));
+	}
 
 	return res;
 }
@@ -239,6 +250,7 @@ bool Client::get_file(const string &file, const AddrStorage &addr)
 	send_to(s,addr);
 
 	Datagram r(0,0);
+
 	if(receive_from(r,addr))
 	{
 		if(r.code == 1)
@@ -282,11 +294,11 @@ bool Client::get_file(const string &file, const AddrStorage &addr)
 
 				succes = true;
 			}
-			else _exc.push_back(Exception("Client::get_file : Server doesn't find this file, or this file's empty.", __LINE__));		
+			else throw (Exception("Client::get_file : Server doesn't find this file, or this file's empty.", __LINE__));		
 		}
-		else _exc.push_back(Exception("Client::_get_file : Server doesn't find this file.", __LINE__));
+		else throw (Exception("Client::get_file : Server doesn't find this file.", __LINE__));
 	}
-	else _exc.push_back(Exception("Client::get_file : Server didn't answer", __LINE__));
+	else throw (Exception("Client::get_file : Server didn't answer", __LINE__));
 
 	return succes;
 }

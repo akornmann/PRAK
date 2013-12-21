@@ -16,7 +16,7 @@ class Datagram
 	Datagram(int code);
 	Datagram();
 	
-	void init(int code, int seq, string str);
+	void init(int c, int s, string str);
 	void init(int code, int seq);
 	void init(int code);
 

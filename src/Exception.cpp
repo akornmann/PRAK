@@ -9,5 +9,6 @@ Exception::Exception(const string &str, int line)
 const char * Exception::what() const throw()
 {
 	string str = "Ligne "+Converter::itos(_line)+" : "+_exc;
+	cout << str << endl;
 	return str.c_str();
 }

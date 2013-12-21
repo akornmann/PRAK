@@ -20,15 +20,15 @@ Datagram::Datagram()
 	init(0);
 }
 
-void Datagram::init(int code, int seq, string s)
+void Datagram::init(int c, int s, string str)
 {
-	s = s.substr(0,DATASIZE);
+	str = str.substr(0,DATASIZE);
 	
 	memset(this,0,sizeof(*this));
 	
-	code = code;
-	seq = seq;
-	strcpy(data,Converter::stocs(s));
+	code = c;
+	seq = s;
+	strcpy(data,Converter::stocs(str));
 }
 
 void Datagram::init(int code, int seq)

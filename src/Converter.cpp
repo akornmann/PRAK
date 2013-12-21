@@ -21,6 +21,12 @@ string Converter::cstos(char* cstr)
 	return s;
 }
 
+string Converter::cstos(const char* cstr)
+{
+	string s = string(cstr);
+	return s;
+}
+
 const char* Converter::stocs(string str)
 {
 	return str.c_str();
