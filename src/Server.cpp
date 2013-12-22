@@ -58,8 +58,10 @@ void Server::run()
 		if(_sockets[i]>max) max = _sockets[i];
 	}
 
-	Datagram dg;;
+	Datagram dg;
 
+	
+	AddrStorage *addr = new AddrStorage();
 	//Start server (infinite loop)
 	while(_run)
 	{
@@ -69,7 +71,6 @@ void Server::run()
 			{
 				if(FD_ISSET(_sockets[i], &readfds))
 				{
-					AddrStorage *addr = new AddrStorage();
 					receive(dg,addr,_sockets[i]);
 					update_client_map(*addr);
 					process(dg,*addr);
@@ -78,25 +79,18 @@ void Server::run()
 		}
 		else _exc.push_back(Exception("Server::server : select failed.",__LINE__));
 	}
+	delete addr;
 }
 
-bool Server::send_to(const Datagram &dg, const AddrStorage &addr)
+void Server::send_to(const Datagram &dg, const AddrStorage &addr)
 {
 	int r = sendto(sock(addr),&dg,sizeof(Datagram),0,addr.sockaddr(),addr.len());
 	
-	if(r!=-1) 
-	{
-		cout << dg << " to " << addr << endl;
-		return true;
-	}
-	else
-	{
-		_exc.push_back(Exception("Server::send_to : sendto failed.",__LINE__));
-		return false;
-	}
+	if(r==-1) _exc.push_back(Exception("Server::send_to : sendto failed.",__LINE__));
+	else cout << dg << " to " << addr << endl;
 }
 
-bool Server::receive(Datagram &dg, AddrStorage *addr, int s)
+void Server::receive(Datagram &dg, AddrStorage *addr, int s)
 {
 	struct sockaddr_storage *temp_addr = addr->storage();
 	//struct sockaddr_storage temp_addr;
@@ -108,14 +102,11 @@ bool Server::receive(Datagram &dg, AddrStorage *addr, int s)
 	if(r!=-1)
 	{
 		addr->build(s);
-		cout << dg << " from " <<* addr << endl;
-		return true;
+		cout << dg << " from " << *addr << endl;
 	}
-	else
-	{
-		_exc.push_back(Exception("Server::receive : recvfrom failed.", __LINE__));
-		return false;
-	}
+	else _exc.push_back(Exception("Server::receive : recvfrom failed.", __LINE__));
+	
+	return;
 }
 
 
@@ -126,81 +117,85 @@ bool Server::receive(Datagram &dg, AddrStorage *addr, int s)
  *
  */
 
-bool Server::connect_ack(const Datagram &dg, const AddrStorage &addr)
+void Server::connect_ack(const Datagram &dg, const AddrStorage &addr)
 {
 	Datagram s(CONNECTRA, dg.seq+1, "Hey pretty client !");
+	_client_map[addr].refresh();
 	_client_map[addr]._status = CONNECT;
-	return send_to(s,addr);
+	send_to(s,addr);
+	return;
 }
 
-bool Server::disconnect_ack(const Datagram &dg, const AddrStorage &addr)
+void Server::disconnect_ack(const Datagram &dg, const AddrStorage &addr)
 {
 	Datagram s(DISCONNECTRA, dg.seq-1, "Bye lovely client !");
-	_client_map[addr]._status = DISCONNECT;
-	return send_to(s,addr);
+	_client_map[addr].refresh();
+	send_to(s,addr);
+	return;
 }
 
-bool Server::send_file(const Datagram &dg, const AddrStorage &addr)
+void Server::send_file(const Datagram &dg, const AddrStorage &addr)
 {
-	string new_file = "", file = "";
-	int end_size = 0, seq = 0, size = 0, packet_number = 0;
+	int init, size;
+	string file;
 
-	Datagram s;
+	Datagram asw;
 
-	char* buffer;
 	State *current = &_client_map[addr];
-	File *f = new File();
+	File *f;
 
-	switch(dg.seq)
+	char *buffer;
+	
+	if(dg.seq==META) current->_status = META;
+
+	switch(current->_status)
 	{
-	case -1 :
-		//trouver le fichier local ou à l'exterieur !
-		new_file = dg.data; //hidden cast
-		current->_file = new_file;
-		f->file(new_file);
-		size = f->size();
-
-		s.init(1,size);
-		send_to(s,addr);
-		break;
-	case 0 :
-		f->file(current->_file);
-		size = f->size();
-
-		packet_number = ceil((float) size/ (float) (DATASIZE-1));
-		for(int i=1;i<=packet_number;i++)
+	case META :
+		file = Converter::cstos(dg.data);
+		if(find_file(file))
 		{
-			if(i*(DATASIZE-1)<=size)
-			{
-				seq = i*(DATASIZE-1);
-				buffer = f->readChar(DATASIZE-1);
-				s.init(1,seq,Converter::cstos(buffer));
-				send_to(s,addr);
-			}
-			else
-			{
-				end_size = size-(i-1)*(DATASIZE-1);
-				buffer = f->readChar(end_size);
-				s.init(1,size,Converter::cstos(buffer));
-				send_to(s,addr);
-			}
+			f = new File(file);
+			size = f->size();
+			asw.init(DOWNLOAD,size,"Here is meta !");
+			send_to(asw,addr);
+			current->_status = DATA;
+			current->_file = file;
+			current->_buffer = f->readChar(size);
+			current->_size = size;
+			delete f;
 		}
+		else
+		{
+			asw.init(DOWNLOAD,-1,"File doesn't exist !");
+			send_to(asw,addr);
+			current->refresh();
+		}
+		break;
+
+	case DATA :
+		if(dg.seq == current->_size) init = dg.seq-(dg.seq%(DATASIZE-1));
+		else init = dg.seq-(DATASIZE-1);
+		
+		buffer = new char[dg.seq-init+1];
+		buffer[dg.seq-init] = '\0';
+
+		for(int j=init;j<dg.seq;j++)
+		{
+			buffer[j-init] = current->_buffer[j];
+		}
+		
+		asw.init(DOWNLOAD,dg.seq,buffer);
+		send_to(asw,addr);
 		break;
 		
 	default :
-		
-		cout << "End of transfer" << endl;
 		break;
 	}
 
-	return true;
-
-
-	//PROTOCOLE A AMELIORER !!!
-	//VERIFICATION PAS DE PERTE DE PAQUETS
+	return;
 }
 
-bool Server::get_file(const Datagram &dg, const AddrStorage &addr)
+void Server::get_file(const Datagram &dg, const AddrStorage &addr)
 {
 	int i, init, size, packet_number, current_packet;
 	Datagram asw;
@@ -224,10 +219,11 @@ bool Server::get_file(const Datagram &dg, const AddrStorage &addr)
 			remove_file(current->_file);
 		}
 		if(dg.seq==-1) current->_title = dg.data;
-		if(dg.seq>0)
+		if(dg.seq>MINSIZE)
 		{
 			current->_size = dg.seq;
-			current->_buffer = new char[dg.seq];
+			current->_buffer = new char[dg.seq+1];
+			current->_buffer[dg.seq] = '\0';
 			packet_number = ceil((float) current->_size/(float) (DATASIZE-1));
 			current->_received_packet.resize(packet_number,false);
 		}
@@ -251,36 +247,33 @@ bool Server::get_file(const Datagram &dg, const AddrStorage &addr)
 		else
 		{
 			init = dg.seq-(size-(packet_number-1)*(DATASIZE-1));
-			current_packet = packet_number-1;
+			current_packet = packet_number;
 		}
 
-		for(i=init;i<=dg.seq;i++)
+		for(i=init;i<dg.seq;i++)
 		{
 			current->_buffer[i] = dg.data[i-init];
 		}
-		current->_received_packet[current_packet] = true;
+
+		current->_received_packet[current_packet-1] = true;
 		
 		asw.init(UPLOAD,dg.seq,"Ack");
 		send_to(asw,addr);
 
 		if(current->is_data())
 		{
-			current->_received_packet.resize(0);
-			current->_status = DISCONNECT;
 			f = new File(current->_file);
 			f->write(Converter::cstos(current->_buffer));
-			current->_file = "";
-			current->_title = "";
-			current->_size = 0;
-			delete[] current->_buffer;
 			delete f;
+			current->refresh();
 		}
 		break;
 
 	default :
 		break;
 	}
-	return true;
+
+	return;
 }
 
 /*
@@ -290,32 +283,31 @@ bool Server::get_file(const Datagram &dg, const AddrStorage &addr)
  *
  */
 
-bool Server::process(const Datagram &dg, const AddrStorage &addr)
+void Server::process(const Datagram &dg, const AddrStorage &addr)
 {
-	bool res = false;
-
+	//gestionnaire d'exception
 	switch(dg.code)
 	{
 	case CONNECT :
-		res = connect_ack(dg,addr);
+		connect_ack(dg,addr);
 		break;
 	case DISCONNECT :
-		res = disconnect_ack(dg,addr);
+		disconnect_ack(dg,addr);
 		break;
 	case DOWNLOAD :
-		res = send_file(dg,addr);
+		send_file(dg,addr);
 		break;
 	case UPLOAD :
-		res = get_file(dg,addr);
+		get_file(dg,addr);
 		break;
 	default :
 		break;
 	}
 
-	return res;
+	return;
 }
 
-bool Server::update_client_map(const AddrStorage &addr)
+void Server::update_client_map(const AddrStorage &addr)
 {
 	addr_map::const_iterator it = _client_map.find(addr);
 	if(it == _client_map.end())
@@ -324,11 +316,16 @@ bool Server::update_client_map(const AddrStorage &addr)
 		_client_map[addr] = new_state;
 	}
 
+	return;
+}
+
+bool Server::find_file(const string &file)
+{
 	return true;
 }
 
-bool Server::remove_file(const string &file)
+void Server::remove_file(const string &file)
 {
 	//penser a supprimer sur tout les serveurs
-	return remove(Converter::stocs(file));
+	remove(Converter::stocs(file));
 }

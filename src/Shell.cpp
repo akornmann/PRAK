@@ -30,13 +30,13 @@ void Shell::wait_command()
 		else if(ask == "connect") connect(v);
 		else if(ask == "dl" || ask == "lire") download(v);
 		else if(ask == "ul" || ask == "stocker") upload(v);
-		else if(ask == "error") error();
 		else fail();
 	}
 	catch(Exception e)
 	{
-		//DECONNEXION !!!
-		e.what();
+		cout << "Une erreur est survenue !"<< endl << e.what() << endl;
+		AddrStorage addr = e.addr();
+		if(addr.pport()!="0") _c->disconnect_req(addr);
 	}
 
 	wait_command();
@@ -112,16 +112,5 @@ void Shell::upload(vector<string> v)
 		return;
 	}
 	
-	return;
-}
-
-void Shell::error()
-{
-	exc error = _c->error();
-	exc::const_iterator it;
-	for(it=error.begin();it!=error.end();++it)
-	{
-		cout << it->what() << endl;
-	}
 	return;
 }

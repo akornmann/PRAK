@@ -18,6 +18,7 @@ class Exception : public exception
 	virtual ~Exception() throw(){}
  
 	virtual const char * what() const throw();
+	AddrStorage & addr();
  
  private:
 	string _exc;

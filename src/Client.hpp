@@ -15,6 +15,7 @@
 #include "Exception.hpp"
 #include "File.hpp"
 #include "State.hpp"
+#include "Counter.hpp"
 
 using namespace std;
 
@@ -36,34 +37,28 @@ class Client
 	~Client();
 
 	int sock(const AddrStorage &addr);
-	bool connect(const AddrStorage &addr);
-	bool synchronize(AddrStorage *addr);
 
 	//Envoi/reception de datagrammes
-	bool send_to(const Datagram &dg, const AddrStorage &addr);
+	void send_to(const Datagram &dg, const AddrStorage &addr);
 	bool receive(Datagram &dg, AddrStorage *addr);
 	bool receive_from(Datagram &dg, const AddrStorage &addr);
 
 	//Protocole de base
-	bool connect_req(const AddrStorage &addr);
-	bool disconnect_req(const AddrStorage &addr);
-	bool get_file(const string &file, const AddrStorage &addr);
-	bool send_file(const string &file, const string &title, const AddrStorage &addr);
+	void connect_req(const AddrStorage &addr);
+	void disconnect_req(const AddrStorage &addr);
+	void get_file(const string &file, const AddrStorage &addr);
+	void send_file(const string &file, const string &title, const AddrStorage &addr);
 
 	//Surcouche client
-	bool get_file(string file);
-	bool send_file(string file, string title);
+	void synchronize(AddrStorage *addr);
+	void get_file(string file);
+	void send_file(string file, string title);
 
-	//Gestion erreurs
-	exc error();
-	
  private :
 	int _sock_4;
 	int _sock_6;
 
 	addr_map _server_map;
-
-	exc _exc;
 };
 
 #endif

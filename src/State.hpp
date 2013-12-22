@@ -14,6 +14,7 @@ enum Status
 	ACTIVE,
 	META,
 	DATA,
+	MINSIZE,
 };
 
 enum CS
@@ -32,8 +33,11 @@ public :
 
 	~State();
 
+	void refresh();
+
 	bool is_meta();
 	bool is_data();
+
 
 	friend ostream& operator<<(ostream& os, const State &s);
 
@@ -52,9 +56,6 @@ public :
 
 	//DATA
 	char *_buffer;
-
-
-
 };
 
 #endif

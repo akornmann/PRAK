@@ -18,7 +18,6 @@ class Shell
 	void connect(vector<string> cmd);
 	void download(vector<string> cmd);
 	void upload(vector<string> cmd);
-	void error();
 
 	Client *_c;
 };

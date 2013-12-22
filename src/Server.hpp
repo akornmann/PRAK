@@ -15,19 +15,20 @@ class Server : public Client
 	void run();
 	
 	//Envoi/reception de datagrammes
-	bool send_to(const Datagram &dg, const AddrStorage &addr);
-	bool receive(Datagram &dg, AddrStorage *addr, int s);
+	void send_to(const Datagram &dg, const AddrStorage &addr);
+	void receive(Datagram &dg, AddrStorage *addr, int s);
 
 	//Protocole de base
-	bool connect_ack(const Datagram &dg, const AddrStorage &addr);
-	bool disconnect_ack(const Datagram &dg, const AddrStorage &addr);
-	bool get_file(const Datagram &dg, const AddrStorage &addr);
-	bool send_file(const Datagram &dg, const AddrStorage &addr);
+	void connect_ack(const Datagram &dg, const AddrStorage &addr);
+	void disconnect_ack(const Datagram &dg, const AddrStorage &addr);
+	void get_file(const Datagram &dg, const AddrStorage &addr);
+	void send_file(const Datagram &dg, const AddrStorage &addr);
 	
 	//Surcouche serveur
-	bool process(const Datagram &dg, const AddrStorage &addr);
-	bool update_client_map(const AddrStorage &addr);
-	bool remove_file(const string &file);
+	void process(const Datagram &dg, const AddrStorage &addr);
+	void update_client_map(const AddrStorage &addr);
+	bool find_file(const string& file);
+	void remove_file(const string &file);
 
  private :
 	int _sockets[MAXSOCK];
@@ -38,9 +39,6 @@ class Server : public Client
 	addr_map _client_map;
 	
 	vector<Exception> _exc;
-	
-	// Obsolete
-	File _curr;
 };
 
 #endif
