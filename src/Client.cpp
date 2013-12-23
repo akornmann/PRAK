@@ -11,8 +11,7 @@ Client::Client(string &config)
 	
 	while((line = conf.read(i)) != "end")
 	{
-		string delim = " ";
-		vector<string> v = Converter::split(line,delim);
+		vector<string> v = Converter::split(line," ");
 		string a = v[0];
 		string p = v[1];
 		
@@ -148,7 +147,7 @@ bool Client::receive_from(Datagram &dg, const AddrStorage &addr)
 			}
 			else throw (Exception("Client::receive_from : Failed.", __LINE__));
 		}
-		else throw (Exception("Client::receive_from : Packet coming from wrong server.", __LINE__));
+		else res = false; //Wrong server packet incoming
 		
 	}
 	else res = false; //Timer expired
@@ -179,11 +178,11 @@ void Client::disconnect_req(const AddrStorage &addr)
 	return;
 }
 
-void Client::get_file(const string &file, const AddrStorage &addr)
+string Client::get_file(const string &file, const AddrStorage &addr)
 {
 	if(file == "") throw (Exception("Client::get_file : File name can't be empty.", addr, __LINE__));
 
-	Datagram rcv(0,0);
+	Datagram rcv(0,-1);
 
 	//META
 	Datagram start(DOWNLOAD,META,file);
@@ -195,7 +194,7 @@ void Client::get_file(const string &file, const AddrStorage &addr)
 		receive_from(rcv,addr);
 		++c;
 	}
-	while(rcv.seq==0 || rcv.code != DOWNLOAD);
+	while(rcv.seq<0 || rcv.code != DOWNLOAD);
 
 	if(rcv.seq<=MINSIZE) throw (Exception("Client::get_file : This file doesn't exist",addr,__LINE__));
 	
@@ -243,11 +242,8 @@ void Client::get_file(const string &file, const AddrStorage &addr)
 			buffer[j] = rcv.data[j-init];
 		}
 	}
-
-	//Maybe improve with ostream
-	cout << buffer << endl;
 	
-	return;
+	return Converter::cstos(buffer);
 }
 
 
@@ -261,8 +257,7 @@ void Client::send_file(const string &file, const string &title,const AddrStorage
 		remove(Converter::stocs(file));
 		throw (Exception("Client::send_file : This file doesn't exist !",addr, __LINE__));
 	}
-	string trunc_title = title.substr(0,80); //truncate title to 80
-	if(trunc_title == "") throw (Exception("Client::send_file : Title can't be empty.",addr, __LINE__));
+	if(title == "") throw (Exception("Client::send_file : Title can't be empty.",addr, __LINE__));
 	Datagram rcv;
 	char* buffer;
 
@@ -282,7 +277,7 @@ void Client::send_file(const string &file, const string &title,const AddrStorage
 
 	//SENDING METADATA
 	Datagram meta_file(UPLOAD,-2,file);
-	Datagram meta_title(UPLOAD,-1,trunc_title);
+	Datagram meta_title(UPLOAD,-1,title);
 	Datagram meta_size(UPLOAD,size);
 
 	c.restart(5);
@@ -337,9 +332,19 @@ void Client::send_file(const string &file, const string &title,const AddrStorage
  *
  *
  */
+void Client::flush()
+{
+	Datagram dg;
+	AddrStorage *addr = new AddrStorage();
+
+	while(receive(dg,addr)) cout << "flushed"<<endl;;
+	
+	delete addr;
+}
 
 void Client::synchronize(AddrStorage *addr)
 {
+	flush();
 	addr_map::const_iterator it;
 
 	//Sending a connection request to every server
@@ -350,19 +355,25 @@ void Client::synchronize(AddrStorage *addr)
 	}
 
 	//First receive -> Winner server !
-	if(!receive(dg,addr)) throw (Exception("Client::synchronize : No server answered.", __LINE__));
-	else
+	Counter c(5);
+	do
 	{
-		//Set status connect to first answer
-		_server_map[*addr]._status = CONNECT;
-
-		//Disconnect from other server
-		for(it=_server_map.begin();it!=_server_map.end();++it)
-		{
-			Equal e;
-			if(!e(it->first,*addr)) disconnect_req(it->first);
-		}
+		receive(dg,addr);
+		++c;
 	}
+	while(dg.code != CONNECTRA);
+
+	//Set status connect to first answer
+	_server_map[*addr]._status = CONNECT;
+
+	//Disconnect from other server
+	Equal e;
+	for(it=_server_map.begin();it!=_server_map.end();++it)
+	{
+		if(!e(it->first,*addr)) disconnect_req(it->first);
+	}
+
+	flush();
 	
 	return;
 }
@@ -372,12 +383,14 @@ void Client::get_file(string file)
 	AddrStorage *addr = new AddrStorage(); 
 
 	synchronize(addr);
-	get_file(file,*addr);
-
+	string res = get_file(file,*addr);
+	
 	disconnect_req(*addr);
 	_server_map[*addr]._status = DISCONNECT;
 
 	delete addr;
+	
+	cout << res << endl;
 
 	return;
 }
@@ -394,5 +407,11 @@ void Client::send_file(string file, string title)
 
 	delete addr;
 
+	return;
+}
+
+void Client::get_library()
+{
+	get_file(".library");
 	return;
 }

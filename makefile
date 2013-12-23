@@ -14,6 +14,9 @@ $(EXEC): $(OBJS)
 	$(CXX) $(CFLAGS) -o $@ $^
 	mv *.o bin/
 	cp src/server.cfg bin
+	cp -r bin /home/kalex/server1
+	cp -r bin /home/kalex/server2
+	cp -r bin /home/kalex/server3
 %.o: %.cpp
 	$(CXX) $(CFLAGS) -o $@ -c $<
 

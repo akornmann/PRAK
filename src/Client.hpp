@@ -16,6 +16,7 @@
 #include "File.hpp"
 #include "State.hpp"
 #include "Counter.hpp"
+#include "library.hpp"
 
 using namespace std;
 
@@ -26,9 +27,6 @@ enum Protocol
 	DOWNLOAD,
 	UPLOAD,
 };
-
-
-typedef vector<Exception> exc;
 
 class Client
 {
@@ -42,19 +40,22 @@ class Client
 	void send_to(const Datagram &dg, const AddrStorage &addr);
 	bool receive(Datagram &dg, AddrStorage *addr);
 	bool receive_from(Datagram &dg, const AddrStorage &addr);
-
+	
 	//Protocole de base
 	void connect_req(const AddrStorage &addr);
 	void disconnect_req(const AddrStorage &addr);
-	void get_file(const string &file, const AddrStorage &addr);
+	string get_file(const string &file, const AddrStorage &addr);
 	void send_file(const string &file, const string &title, const AddrStorage &addr);
+	
 
 	//Surcouche client
+	void flush();
 	void synchronize(AddrStorage *addr);
 	void get_file(string file);
 	void send_file(string file, string title);
+	void get_library();
 
- private :
+ protected :
 	int _sock_4;
 	int _sock_6;
 

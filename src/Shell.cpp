@@ -30,6 +30,7 @@ void Shell::wait_command()
 		else if(ask == "connect") connect(v);
 		else if(ask == "dl" || ask == "lire") download(v);
 		else if(ask == "ul" || ask == "stocker") upload(v);
+		else if(ask == "lib" || ask == "catalogue") library();
 		else fail();
 	}
 	catch(Exception e)
@@ -69,6 +70,7 @@ void Shell::connect(vector<string> cmd)
 		file = "server.cfg";
 		_c = new Client(file);
 		_c->synchronize(addr);
+		_c->disconnect_req(*addr);
 		break;
 	case 2 :
 		cout << "Connecting with custom configuration file" << endl;
@@ -112,5 +114,11 @@ void Shell::upload(vector<string> v)
 		return;
 	}
 	
+	return;
+}
+
+void Shell::library()
+{
+	_c->get_library();
 	return;
 }

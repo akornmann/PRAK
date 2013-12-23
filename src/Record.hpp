@@ -14,6 +14,7 @@ public :
 	void remove(const AddrStorage &addr);
 	
 	string file();
+	string title();
 	vector<AddrStorage> saved();
 
 	friend ostream & operator<<(ostream &os, Record &r);

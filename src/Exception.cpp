@@ -16,9 +16,9 @@ Exception::Exception(const string &str, const AddrStorage &addr, int line)
 const char * Exception::what() const throw()
 {
 	if(_addr.pport()!= "22")
-		return Converter::stocs(_exc+" "+_addr.paddr()+":"+_addr.pport());
+		return Converter::stocs("error : "+_exc+" "+_addr.paddr()+":"+_addr.pport());
 	else
-		return Converter::stocs(_exc);		
+		return Converter::stocs("error : "+_exc);		
 }
 
 AddrStorage & Exception::addr()

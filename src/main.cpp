@@ -10,16 +10,16 @@
 
 int main(int argc, const char* argv[])
 {
-	string port = "4242";
-	string type;
+	string type,port,addr;
 	switch(argc)
 	{
 	case 2 :
 		type = argv[1];
 		break;
-	case 3 :
+	case 4 :
 		type = argv[1];
-		port = argv[2];
+		addr = argv[2];
+		port = argv[3];
 		break;
 	default :
 		cout << "Invalid arguments" << endl;
@@ -29,15 +29,8 @@ int main(int argc, const char* argv[])
 
 	if(type == "server")
 	{
-		try
-		{
-			string config = "server.cfg";
-			Server s(port,config);
-		}
-		catch(const Exception &e)
-		{
-			e.what();
-		}
+		string config = "server.cfg";
+		Server s(addr,port,config);
 	}
 	else if(type == "client")
 	{
@@ -46,7 +39,7 @@ int main(int argc, const char* argv[])
 	else
 	{
 		cout << "Invalid arguments" << endl;
-		cout << argv[0] << " server|client [port]" << endl;
+		cout << argv[0] << " server|client [ip port]" << endl;
 	}
 
 	return true;

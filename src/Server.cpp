@@ -1,6 +1,6 @@
 #include "Server.hpp"
 
-Server::Server(string port, string config):Client(config),_run(true)
+Server::Server(string addr, string port, string config):Client(config),_run(true),_self(addr,port)
 {
 	//We look every interfaces we can use
 	struct addrinfo local, *iterator, *start;
@@ -22,9 +22,7 @@ Server::Server(string port, string config):Client(config),_run(true)
 			{
 				_n_socks++;
 			}
-			else _exc.push_back(Exception("Server::Server : Bind failed.", __LINE__));
 		}
-		else _exc.push_back(Exception("Server::Server : socket failed.", __LINE__));
 	}
 	
 	freeaddrinfo(start);
@@ -60,8 +58,12 @@ void Server::run()
 
 	Datagram dg;
 
-	
+	Record r(".library","locallibrary",_self);
+	_lib = insert(_lib,r);
+	to_file(_lib,".library");
+
 	AddrStorage *addr = new AddrStorage();
+
 	//Start server (infinite loop)
 	while(_run)
 	{
@@ -71,13 +73,13 @@ void Server::run()
 			{
 				if(FD_ISSET(_sockets[i], &readfds))
 				{
-					receive(dg,addr,_sockets[i]);
+				       	receive(dg,addr,_sockets[i]);
 					update_client_map(*addr);
 					process(dg,*addr);
 				}
 			}
 		}
-		else _exc.push_back(Exception("Server::server : select failed.",__LINE__));
+		else throw (Exception("Server::server : select failed.",__LINE__));
 	}
 	delete addr;
 }
@@ -86,7 +88,7 @@ void Server::send_to(const Datagram &dg, const AddrStorage &addr)
 {
 	int r = sendto(sock(addr),&dg,sizeof(Datagram),0,addr.sockaddr(),addr.len());
 	
-	if(r==-1) _exc.push_back(Exception("Server::send_to : sendto failed.",__LINE__));
+	if(r==-1) throw (Exception("Server::send_to : sendto failed.",__LINE__));
 	else cout << dg << " to " << addr << endl;
 }
 
@@ -104,7 +106,7 @@ void Server::receive(Datagram &dg, AddrStorage *addr, int s)
 		addr->build(s);
 		cout << dg << " from " << *addr << endl;
 	}
-	else _exc.push_back(Exception("Server::receive : recvfrom failed.", __LINE__));
+	else throw (Exception("Server::receive : recvfrom failed.", __LINE__));
 	
 	return;
 }
@@ -285,23 +287,29 @@ void Server::get_file(const Datagram &dg, const AddrStorage &addr)
 
 void Server::process(const Datagram &dg, const AddrStorage &addr)
 {
-	//gestionnaire d'exception
-	switch(dg.code)
+	try
 	{
-	case CONNECT :
-		connect_ack(dg,addr);
-		break;
-	case DISCONNECT :
-		disconnect_ack(dg,addr);
-		break;
-	case DOWNLOAD :
-		send_file(dg,addr);
-		break;
-	case UPLOAD :
-		get_file(dg,addr);
-		break;
-	default :
-		break;
+		switch(dg.code)
+		{
+		case CONNECT :
+			connect_ack(dg,addr);
+			break;
+		case DISCONNECT :
+			disconnect_ack(dg,addr);
+			break;
+		case DOWNLOAD :
+			send_file(dg,addr);
+			break;
+		case UPLOAD :
+			get_file(dg,addr);
+			break;
+		default :
+			break;
+		}
+	}
+	catch(Exception e)
+	{
+		cout << e.what() << endl;
 	}
 
 	return;
@@ -319,9 +327,89 @@ void Server::update_client_map(const AddrStorage &addr)
 	return;
 }
 
+void Server::update_library()
+{
+	cout << ">>>>>>>>>>UPDATE LIB" << endl;
+	Equal e;
+	//asking other server .library
+	addr_map::const_iterator it;
+	for(it=_server_map.begin();it!=_server_map.end();++it)
+	{
+		if(!e(it->first,_self))
+		{
+			cout << it->first << " <-> " << _self << endl;
+			Client::flush();
+			string res = Client::get_file(".library",it->first);
+			cout << "file got"<<endl;
+			Client::disconnect_req(it->first);
+			_server_map[it->first]._status = DISCONNECT;
+			Client::flush();
+			cout << "library_temp : " << res << endl;
+			//File f(".library_temp");
+			//f.write(res);
+			//library new_lib = from_file(".library_temp");
+			//remove(Converter::stocs(".library_temp"));
+
+			//_lib = _lib+new_lib;
+		}
+	}
+
+	return;
+}
+
 bool Server::find_file(const string &file)
 {
-	return true;
+	//if(file!=".library") update_library();
+
+	Equal e;
+	//First we search in local library
+	bool found = false;
+	library::iterator it;
+	
+	AddrStorage *addrfile;
+
+	for(it=_lib.begin();it!=_lib.end();++it)
+	{//TESTED
+		if(it->file()==file)
+		{
+			vector<AddrStorage>::iterator it2;
+			vector<AddrStorage> saved = it->saved();
+
+			for(it2=saved.begin();it2!=saved.end();++it2)
+			{
+				//if file is stored localy
+				if(e(*it2,_self))
+				{
+					cout << file << " is stored on this server." << endl;
+					return true;
+				}
+			}
+
+			addrfile = &saved.front();
+			found = true;
+		}
+	}
+
+	if(found) //in local library, but not on this server
+	{//NOT TESTED
+		//become a client, and dl from other server
+		Client::connect_req(*addrfile);
+		string res = Client::get_file(file,*addrfile);
+		Client::disconnect_req(*addrfile);
+		_server_map[*addrfile]._status = DISCONNECT;
+		
+		delete addrfile;
+		
+		File f(file);
+		f.write(res);
+		cout << file << " is stored on other server." << endl;
+		return true;
+	}
+	else
+	{
+		cout << file << " doesnt exist." << endl;
+		return false;
+	}
 }
 
 void Server::remove_file(const string &file)

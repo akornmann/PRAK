@@ -43,6 +43,11 @@ string Record::file()
 	return _file;
 }
 
+string Record::title()
+{
+	return _title;
+}
+
 vector<AddrStorage> Record::saved()
 {
 	return _saved;
@@ -51,14 +56,20 @@ vector<AddrStorage> Record::saved()
 
 ostream & operator<<(ostream &os, Record &r)
 {
-	os << r._file << " " << r._title << " ";
+	string title = r._title.substr(0,70);
+	string file = r._file.substr(0,8);
+	unsigned int lim = 8;
+	if(file.length()<lim) for(unsigned int i=0;i<lim-file.length();++i) file = file + " ";
+	os << file << " " << title;
 
+	/*
 	vector<AddrStorage>::iterator it;
 
 	for(it=r._saved.begin();it!=r._saved.end();++it)
 	{
-		os << *it << " ";
+		os << "stored at " <<*it<<endl;
 	}
+	*/
 	
 	return os;
 }

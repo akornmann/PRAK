@@ -8,7 +8,7 @@ using namespace std;
 class Server : public Client
 {
  public :
-	Server(string port, string config);
+	Server(string addr, string port, string config);
 	~Server();
 
 	int sock(const AddrStorage &addr);
@@ -21,12 +21,14 @@ class Server : public Client
 	//Protocole de base
 	void connect_ack(const Datagram &dg, const AddrStorage &addr);
 	void disconnect_ack(const Datagram &dg, const AddrStorage &addr);
+
 	void get_file(const Datagram &dg, const AddrStorage &addr);
 	void send_file(const Datagram &dg, const AddrStorage &addr);
-	
+
 	//Surcouche serveur
 	void process(const Datagram &dg, const AddrStorage &addr);
 	void update_client_map(const AddrStorage &addr);
+	void update_library();
 	bool find_file(const string& file);
 	void remove_file(const string &file);
 
@@ -36,9 +38,10 @@ class Server : public Client
 	
 	bool _run;
 
+	AddrStorage _self;
+
 	addr_map _client_map;
-	
-	vector<Exception> _exc;
+	library _lib;
 };
 
 #endif
