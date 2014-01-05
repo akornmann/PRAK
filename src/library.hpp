@@ -12,7 +12,5 @@ library & insert(library &lib, Record &r);
 library & remove(library &lib, const string &file);
 library & operator+(library &rhs, library &lhs);
 ostream & operator<<(ostream &os, library &lib);
-void to_file(library &lib, const string &file);
-library from_file(const string &file);
 
 #endif

@@ -1,5 +1,5 @@
 CXX=g++
-CFLAGS=-Wall -std=c++0x -g -O0
+CFLAGS=-Wall -std=c++0x
 
 EXEC=bin/PRAK
 
@@ -13,10 +13,8 @@ all: $(EXEC)
 $(EXEC): $(OBJS)
 	$(CXX) $(CFLAGS) -o $@ $^
 	mv *.o bin/
-	cp src/server.cfg bin
-	cp -r bin /home/kalex/server1
-	cp -r bin /home/kalex/server2
-	cp -r bin /home/kalex/server3
+	cp src/server.cfg bin/
+
 %.o: %.cpp
 	$(CXX) $(CFLAGS) -o $@ -c $<
 

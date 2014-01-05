@@ -26,6 +26,9 @@ enum Protocol
 	DISCONNECTRA,
 	DOWNLOAD,
 	UPLOAD,
+	ADD,
+	REMOVE,
+	GET,
 };
 
 class Client
@@ -44,15 +47,20 @@ class Client
 	//Protocole de base
 	void connect_req(const AddrStorage &addr);
 	void disconnect_req(const AddrStorage &addr);
-	string get_file(const string &file, const AddrStorage &addr);
+	string get_file(const string &file, vector<AddrStorage *> addr);
 	void send_file(const string &file, const string &title, const AddrStorage &addr);
-	
+	void add_file(const string& file, string& title, bool rec, const AddrStorage &addr);
+	void remove_file(const string& file, bool rec, const AddrStorage &addr);
+
+	library & get_library(const AddrStorage& addr);
 
 	//Surcouche client
 	void flush();
-	void synchronize(AddrStorage *addr);
+	vector<AddrStorage *> * synchronize();
+	void disconnect(vector<AddrStorage *> *addr);
 	void get_file(string file);
 	void send_file(string file, string title);
+	void remove_file(string file);
 	void get_library();
 
  protected :

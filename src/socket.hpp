@@ -21,4 +21,5 @@
 
 #define MAXSOCK 5
 
+#define TIMER 1
 #endif

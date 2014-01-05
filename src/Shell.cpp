@@ -27,15 +27,15 @@ void Shell::wait_command()
 	try
 	{
 		if(ask == "exit") close();
-		else if(ask == "connect") connect(v);
 		else if(ask == "dl" || ask == "lire") download(v);
 		else if(ask == "ul" || ask == "stocker") upload(v);
 		else if(ask == "lib" || ask == "catalogue") library();
+		else if(ask == "rm" || ask == "detruire") remove(v);
 		else fail();
 	}
 	catch(Exception e)
 	{
-		cout << "Une erreur est survenue !"<< endl << e.what() << endl;
+		cout << endl <<  "An error occured : " << endl << e.what() << endl << endl;
 		AddrStorage addr = e.addr();
 		if(addr.pport()!="0") _c->disconnect_req(addr);
 	}
@@ -46,44 +46,14 @@ void Shell::wait_command()
 void Shell::close()
 {
 	delete _c;
-	cout << "Goodbye !" << endl;
+	cout << endl << "Goodbye !" << endl;
 	exit(true);
 	return;
 }
 
 void Shell::fail()
 {
-	cout << "Command fail" << endl;
-	return;
-}
-
-void Shell::connect(vector<string> cmd)
-{
-	string file;
-	AddrStorage *addr = new AddrStorage();
-	switch(cmd.size())
-	{
-	case 1 :
-		cout << "Connecting with default configuration file" << endl;
-		delete _c;
-		
-		file = "server.cfg";
-		_c = new Client(file);
-		_c->synchronize(addr);
-		_c->disconnect_req(*addr);
-		break;
-	case 2 :
-		cout << "Connecting with custom configuration file" << endl;
-		delete _c;
-		
-		file = cmd[1];
-		_c = new Client(file);
-		break;
-	default :
-		fail();
-		break;
-	}
-
+	cout << endl << "Command fail" << endl;
 	return;
 }
 
@@ -120,5 +90,19 @@ void Shell::upload(vector<string> v)
 void Shell::library()
 {
 	_c->get_library();
+	return;
+}
+
+void Shell::remove(vector<string> v)
+{
+	switch(v.size())
+	{
+	case 2 :
+		_c->remove_file(v[1]);
+		return;
+	default :
+		fail();
+		return;
+	}
 	return;
 }

@@ -17,19 +17,11 @@ enum Status
 	MINSIZE,
 };
 
-enum CS
-{
-	CLIENT,
-	SERVER,
-};
-
 class State
 {
 public :
 	State();
-	State(CS cs);
 	State(Status s);
-	State(Status s, CS cs);
 
 	~State();
 
@@ -38,12 +30,9 @@ public :
 	bool is_meta();
 	bool is_data();
 
-
 	friend ostream& operator<<(ostream& os, const State &s);
 
 	Status _status;
-
-	CS _cs;
 
 	//PACKET RECEIVED
 	int _init_seq;

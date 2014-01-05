@@ -15,9 +15,9 @@ class Shell
 
 	void fail();
 	void close();
-	void connect(vector<string> cmd);
 	void download(vector<string> cmd);
 	void upload(vector<string> cmd);
+	void remove(vector<string> cmd);
 	void library();
 
 	Client *_c;

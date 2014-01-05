@@ -36,53 +36,8 @@ void AddrStorage::build(int s)
 
 	_p_port = Converter::itos(port);
 	_p_addr = Converter::cstos(paddr);
-	
-	//perror("build ");
-	//cout << "New AddrStorage (constructor 1) " << _p_addr << ":" << _p_port << endl;
 }
 
-/*
-AddrStorage::AddrStorage(struct sockaddr *addr, int s):_p_addr(""),_p_port(""),_socket(s)
-{
-	memset(&_addr,0,sizeof(struct sockaddr_storage));
-
-	memcpy(&_addr, addr,sizeof(struct sockaddr));
-
-	_sockaddr = (struct sockaddr*) &_addr;
-
-	int m1 = memcmp(addr,_sockaddr, sizeof(struct sockaddr));
-	int m2 = memcmp(addr,_sockaddr, sizeof(struct sockaddr_storage));
-	cout << "Memory cpy : sockaddr " << m1 << " sockaddrstorage : " << m2 << endl;
-
-	_family = _sockaddr->sa_family;
-	_len = sizeof(struct sockaddr);
-
-	struct in_addr* n_addr;
-	struct in6_addr* n_addr6;
-
-	char paddr[INET6_ADDRSTRLEN];
-	unsigned short port;
-
-	switch(_family)
-	{
-	case AF_INET :
-	        n_addr = &((struct sockaddr_in *) _sockaddr)->sin_addr;
-		port = ((struct sockaddr_in *) _sockaddr)->sin_port;
-		inet_ntop(_family, n_addr, paddr, INET6_ADDRSTRLEN);
-		break ;
-	case AF_INET6 :
-		n_addr6 = &((struct sockaddr_in6 *) _sockaddr)->sin6_addr;
-		port = ((struct sockaddr_in6 *) _sockaddr)->sin6_port;
-		inet_ntop(_family, n_addr6, paddr, INET6_ADDRSTRLEN);
-		break ;
-	}
-	port = ntohs(port);
-
-	_p_port = Converter::itos(port);
-	_p_addr = Converter::cstos(paddr);
-
-}
-*/
 
 
 AddrStorage::AddrStorage(string addr, string port):_p_addr(addr),_p_port(port),_socket(-1)
@@ -111,9 +66,6 @@ AddrStorage::AddrStorage(string addr, string port):_p_addr(addr),_p_port(port),_
 	}
 
 	_sockaddr = (struct sockaddr*) &_addr;
-
-
-	//cout << "New AddrStorage (constructor 2) " << _p_addr << ":" << _p_port << endl;
 }
 
 AddrStorage::AddrStorage(const AddrStorage &as)
