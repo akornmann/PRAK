@@ -14,7 +14,7 @@ class Converter
 	static string cstos(char* cstr);
 	static string cstos(const char* cstr);
 	static const char* stocs(string str);
-	static vector<string> split(string str, string delim);
+	static vector<string> split(const string &str, char delim);
 };
 
 #endif

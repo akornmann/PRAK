@@ -106,7 +106,6 @@ void Server::send_to(const Datagram &dg, const AddrStorage &addr)
 void Server::receive(Datagram &dg, AddrStorage *addr, int s)
 {
 	struct sockaddr_storage *temp_addr = addr->storage();
-	//struct sockaddr_storage temp_addr;
 	socklen_t temp_len;
 	temp_len = sizeof(struct sockaddr_storage);
 
@@ -308,6 +307,7 @@ void Server::add_file(const Datagram &dg, const AddrStorage &addr)
 
 		r = new Record(current->_file,current->_title);
 		_lib = insert(_lib,*r);
+
 		break;
 
 	case 1:

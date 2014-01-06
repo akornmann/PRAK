@@ -2,9 +2,16 @@
 
 Shell::Shell()
 {
-	system("clear");
 	string file = "server.cfg";
-	_c = new Client(file);
+	try
+	{
+		_c = new Client(file);
+	}
+	catch(Exception e)
+	{
+		cout << endl <<  "A fatal error occured : " << endl << e.what() << endl << endl;
+		exit(false);
+	}
 	wait_command();
 }
 
@@ -19,7 +26,7 @@ void Shell::wait_command()
 	string cmd;
 	getline(cin,cmd);
 	
-	string delim = " ";
+	char delim = ' ';
 	vector<string> v = Converter::split(cmd, delim);
 
 	string ask = v[0];

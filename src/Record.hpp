@@ -5,6 +5,7 @@
 #include "AddrStorage.hpp"
 #include "Exception.hpp"
 #include "addr_map.hpp"
+#include <iomanip>
 
 class Record
 {
@@ -13,7 +14,6 @@ public :
 	
 	string file();
 	string title();
-	static string formatFile(string file);
 	friend ostream & operator<<(ostream &os, Record &r);
 
 private :

@@ -1,11 +1,11 @@
 #include "State.hpp"
 
-State::State():_status(DISCONNECT),_init_seq(0),_size(0),_file(""),_title(""),_buffer(nullptr)
+State::State():_status(DISCONNECT),_init_seq(0),_size(0),_file(""),_title(""),_buffer(NULL)
 {
 }
 
 
-State::State(Status s):_status(s),_init_seq(0),_size(0),_file(""),_title(""),_buffer(nullptr)
+State::State(Status s):_status(s),_init_seq(0),_size(0),_file(""),_title(""),_buffer(NULL)
 {
 }
 
@@ -15,10 +15,10 @@ State::~State()
 
 void State::refresh()
 {
-	if(_buffer!=nullptr)
+	if(_buffer!=NULL)
 	{
 		delete[] _buffer;
-		_buffer = nullptr;
+		_buffer = NULL;
 	}
 	_file = "";
 	_title = "";

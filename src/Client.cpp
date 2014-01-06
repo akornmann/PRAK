@@ -11,35 +11,42 @@ Client::Client(string &config)
 	
 	while((line = conf.read(i)) != "end")
 	{
-		vector<string> v = Converter::split(line," ");
-		string a = v[0];
-		string p = v[1];
-
-		//Convert hostname->ip
-		const char *hostname = a.c_str();
-		struct addrinfo hints, *res;
-		struct in_addr tmp;
-
-		memset(&hints, 0, sizeof(hints));
-		hints.ai_socktype = SOCK_STREAM;
-		hints.ai_family = AF_INET;
-
-		if(getaddrinfo(hostname, NULL, &hints, &res)!=0)
-		{
-			throw (Exception("Unable to find this server ("+a+")",__LINE__));
-		}
-
-		tmp.s_addr = ((struct sockaddr_in *)(res->ai_addr))->sin_addr.s_addr;
-
-		freeaddrinfo(res);
-
-		a = inet_ntoa(tmp);
-		//end convert
-
-		AddrStorage addr(a,p);
-		State s(DISCONNECT);
+		char delim = ' ';
+		vector<string> v = Converter::split(line,delim);
 		
-		_server_map[addr] = s;
+		if(v.size()==2)
+		{	
+			string a = v[0];
+			string p = v[1];
+
+			//Convert hostname->ip
+			const char *hostname = a.c_str();
+			struct addrinfo hints, *res;
+			struct in_addr tmp;
+
+			memset(&hints, 0, sizeof(hints));
+			hints.ai_socktype = SOCK_STREAM;
+			hints.ai_family = AF_INET;
+
+			if(getaddrinfo(hostname, NULL, &hints, &res)!=0)
+			{
+				throw (Exception("Unable to find this server ("+a+")",__LINE__));
+			}
+
+			tmp.s_addr = ((struct sockaddr_in *)(res->ai_addr))->sin_addr.s_addr;
+
+			freeaddrinfo(res);
+
+
+			a = inet_ntoa(tmp);
+			//end convert
+
+			AddrStorage addr(a,p);
+			State s(DISCONNECT);
+		
+			_server_map[addr] = s;
+		}
+		else throw (Exception("There is a mistake in server.cfg",__LINE__));
 
 		i++;
 	}
@@ -90,7 +97,6 @@ bool Client::receive(Datagram &dg, AddrStorage *addr)
 {
 	bool res = false;
 
-	//struct sockaddr_storage temp_addr;
 	struct sockaddr_storage *temp_addr = addr->storage();
 	socklen_t temp_len;
 	struct timeval time_val;
@@ -138,7 +144,6 @@ bool Client::receive_from(Datagram &dg, const AddrStorage &addr)
 {
 	bool res = false;
 
-	//struct sockaddr_storage temp_addr;
 	socklen_t temp_len;
 	struct timeval time_val;
 	fd_set readfds;
@@ -162,7 +167,14 @@ bool Client::receive_from(Datagram &dg, const AddrStorage &addr)
 		Equal e;
 		if(e(addr,incoming))
 		{
-			if(r!=-1) res = true;
+			if(r!=-1)
+			{
+				cout << "rcv " << dg.code << " " << ntohs(dg.code) << endl;
+				dg.code = ntohs(dg.code);
+				dg.seq = ntohs(dg.seq);
+				
+				res = true;
+			}
 			else throw (Exception("receive_from : Failed.", __LINE__));
 		}
 		else res = false; //Wrong server packet incoming
@@ -509,10 +521,7 @@ void Client::get_file(string file)
 	string res = get_file(file,*addr);
 	disconnect(addr);
 
-	
-	file = Record::formatFile(file);
-
-	cout << endl << "---- " << file << " ----" << endl << endl;
+       	cout << endl << "---- " << file << " ----" << endl << endl;
 	cout << res << endl;
 	cout << endl << "---------------" << endl << endl;
 	return;

@@ -2,10 +2,10 @@
 
 string Converter::itos(int i)
 {
-    string str;
-    ostringstream temp;
-    temp << i;
-    return temp.str();
+	string str;
+	ostringstream temp;
+	temp << i;
+	return temp.str();
 }
 
 int Converter::stoi(string s)
@@ -32,18 +32,15 @@ const char* Converter::stocs(string str)
 	return str.c_str();
 }
 
-vector<string> Converter::split(string str, string delim)
-{ 
-      unsigned start = 0;
-      unsigned end; 
-      vector<string> v; 
+vector<string> Converter::split(const string &str, char delim)
+{
+    stringstream ss(str);
+    string item;
+    vector<string> elems;
 
-      while((end = str.find(delim, start)) != string::npos)
-      { 
-            v.push_back(str.substr(start, end-start)); 
-            start = end + delim.length(); 
-      }
-
-      v.push_back(str.substr(start)); 
-      return v; 
+    while (std::getline(ss, item, delim))
+    {
+	    elems.push_back(item);
+    }
+    return elems;
 }

@@ -51,7 +51,7 @@ library & operator+(library &rhs, library &lhs)
 ostream & operator<<(ostream &os, library &lib)
 {
 	library::iterator it;
-	os << "Library : " << endl;
+	os << left << setw(10) << "file" << setw(60) << " | title" << endl << endl;
 
 	for(it=lib.begin();it!=lib.end();++it)
 	{
