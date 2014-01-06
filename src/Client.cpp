@@ -14,7 +14,28 @@ Client::Client(string &config)
 		vector<string> v = Converter::split(line," ");
 		string a = v[0];
 		string p = v[1];
-		
+
+		//Convert hostname->ip
+		const char *hostname = a.c_str();
+		struct addrinfo hints, *res;
+		struct in_addr tmp;
+
+		memset(&hints, 0, sizeof(hints));
+		hints.ai_socktype = SOCK_STREAM;
+		hints.ai_family = AF_INET;
+
+		if(getaddrinfo(hostname, NULL, &hints, &res)!=0)
+		{
+			throw (Exception("Unable to find this server ("+a+")",__LINE__));
+		}
+
+		tmp.s_addr = ((struct sockaddr_in *)(res->ai_addr))->sin_addr.s_addr;
+
+		freeaddrinfo(res);
+
+		a = inet_ntoa(tmp);
+		//end convert
+
 		AddrStorage addr(a,p);
 		State s(DISCONNECT);
 		

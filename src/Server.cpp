@@ -354,6 +354,7 @@ void Server::remove_file(const Datagram &dg, const AddrStorage &addr)
 			}
 		}
 	}
+
 	return;
 }
 

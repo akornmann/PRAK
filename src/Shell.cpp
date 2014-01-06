@@ -46,14 +46,14 @@ void Shell::wait_command()
 void Shell::close()
 {
 	delete _c;
-	cout << endl << "Goodbye !" << endl;
+	cout << endl << "Goodbye !" << endl << endl;
 	exit(true);
 	return;
 }
 
 void Shell::fail()
 {
-	cout << endl << "Command fail" << endl;
+	cout << endl << "Command fail" << endl << endl;
 	return;
 }
 
