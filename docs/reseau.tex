@@ -170,27 +170,37 @@ Le client envoie \textbf{dg(1,1,)}. Le serveur répond \textbf{dg(1,0,)}.
 
 \subsection{DOWNLOAD : Récupération d'un fichier présent sur le serveur}
 Pour initier la transaction, le client envoie le paquet \textbf{dg(2,0,nom du fichier)}.
+Les réponses possibles sont :
+\begin{itemize}
+ \item \textbf{dg(2,2,)} : Le fichier est dans la librairie et est disponible sur le serveur.
+ \item \textbf{dg(2,1,)} : Le fichier est dans la librairie masi n'est pas disponible sur le serveur.
+ \item \textbf{dg(2,0,)} : Le fichier n'est pas dans la bibliotèque
+\end{itemize}
+
+En fonction de cette réponse, le client peut décider de demander le fichier, avec \textbf{dg(2,0,nom du fichier)}
 Si le serveur trouve le fichier, il va répondre avec la taille du fichier en numéro de séquence, sinon le serveur répond 0 en numéro de séquence.
-Par la suite le client envoie au serveur des paquets de la forme \textbf{dg(2,x,)}, avec x l'indice du dernier caractère du fichier que l'on souhaite recevoir. Il est du devoir du client de demandé un indice valable (notamment pour le dernier paquet).
-La fin du transfert est signifié à la recéption d'un paquet contenant moins de 512 caractères.
+Par la suite le client envoie au serveur des paquets de la forme \textbf{dg(2,x,)}, avec \textbf{x} l'indice du dernier caractère du fichier que l'on souhaite recevoir.
+La fin du transfert est signifié à la réception d'un paquet contenant moins de 512 caractères.
 
 \subsection{UPLOAD : Envoi d'un fichier sur un serveur}
 Pour initier la transaction, le client envoie le paquet \textbf{dg(3,x,)} et recoit en acquittement le paquet \textbf{dg(3,x,)}.
 Ensuite, le client envoie trois paquets contenant les métadonnées : \textbf{dg(3,0,nom du fichier)}, \textbf{dg(3,1,titre du fichier)}, et \textbf{dg(3,taille du fichier,)}. Le serveur acquitte les trois en renvoyant \textbf{dg(3,taille du fichier,)}.
 Pour le transfert des données, le client envoie un paquet contenant 512 caractères, \textbf{dg(3,seq,chaine de 512 caractères)} que le serveur acquitte par \textbf{dg(3,seq,)}.
-Un paquet de longueur inférieur à 512 signifie la fin de la transaction.
+Un paquet de longueur inférieur à 512 signifie la fin de la transaction. \textbf{seq} indique la position du dernier caractères de la chaîne dans le fichier.
 
 \subsection{ADD : ajout d'un fichier à la bibliotèque}
 Afin d'ajouter un fichier à la bibliotèque, le client envoie deux paquets contenant respectivement le nom du fichier et son titre (\textbf{dg(4,0,nom du fichier)} et \textbf{dg(4,1,titre du fichier)}).
-Le client peut demander à ce que le serveur ajoute cette entrée à tout les autres serveurs, en envoyant un troisième paquet \textbf{dg(4,2,).
 
-Le serveur acquitte chaque paquet en répondant avec le même numéro de séquence que le paquet envoyé.
+Le serveur acquitte chaque paquet en répondant avec le même numéro de séquence que le paquet recu (c'est à dire \textbf{dg(4,0,)} ou \textbf{dg(4,1,)})
 
 \subsection{REMOVE : retrait d'un fichier de la bibliotèque}
-Afin de retirer un fichier de la bibliotèque, le client envoie un paquet \textbf{dg(5,0,nom du fichier)} ou \textbf{dg(5,1,nom du fichier)}, 0 étant la suppression d'un serveur uniquement, 1 ordonnant au serveur de supprimer de tout les autres serveurs également.
+Afin de retirer un fichier de la bibliotèque, le client envoie un paquet \textbf{dg(5,0,nom du fichier)}.
+Le serveur acquitte chaque paquet en répondant \textbf{dg(5,0,)}.
 
 \subsection{GET : récupération de l'intégralité de la bibliotèque}
-
+Afin d'initier la transaction, le client envoie un paquet \textbf{dg(6,0,)}.
+Le serveur répond alors \textbf{dg(6,lignes,)} avec \textbf{lignes} le nombre d'entrée dans la bibliotèque.
+Le client peut alors demander la ième ligne de la bibliotèque (avec \textbf{dg(6,i,)}). Le serveur répond alors en envoyant deux paquets contenant respectivement un nom de fichier et le titre associé (\textbf{dg(6,i,nom du fichier)} et \textbf{dg(6,i+lignes,titre})).
 
 \section{Architecture}
 

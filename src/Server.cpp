@@ -478,7 +478,7 @@ void Server::send_library(const Datagram &dg, const AddrStorage &addr)
 		{
 			asw.init(GET,dg.seq,_lib[dg.seq-1].file());
 			send_to(asw,addr);
-			asw.init(GET,dg.seq,_lib[dg.seq-1].title());
+			asw.init(GET,dg.seq+_lib.size(),_lib[dg.seq-1].title());
 			send_to(asw,addr);
 		}
 		break;

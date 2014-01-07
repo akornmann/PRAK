@@ -496,7 +496,7 @@ library & Client::get_library(const AddrStorage& addr)
 			receive_from(rcv2,addr);
 			++c;
 		}
-		while(rcv.seq!=i || rcv.code != GET || rcv.data == rcv2.data);
+		while(rcv.seq!=i || rcv.code!=GET || rcv2.seq!=i+size || rcv2.code!=GET);
 		Record r(Converter::cstos(rcv.data),Converter::cstos(rcv2.data));
 		insert(lib,r);
 	}
