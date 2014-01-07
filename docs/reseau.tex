@@ -76,6 +76,12 @@ Le client démarre par la commande
 \fbox{./PRAK client} 
 \end{center}
 
+\subsection{Démarage d'un serveur}
+
+Le client démarre par la commande
+\begin{center}
+\fbox{./PRAK server xxxx}
+\end{center}avec xxxx, un port libre sur la machine courante. 
 \subsection{Liste des commandes clients}
 
 \subsubsection{catalogue}
@@ -114,9 +120,13 @@ Le format d'une ligne du fichier du configuration qui contient la liste de tout 
 \begin{center}
 \fbox{NOMHOTE|IPV4|IPV6 PORT}
 \end{center}
-Chaque ligne contient un enregistrement de ce type.\\
-\textit{Attention : ne pas laisser de ligne vide à la fin du fichier, ou d'espace inutile en fin de ligne.}
+Chaque ligne contient un enregistrement du type IP espace PORT, ou HOTE espace PORT.\\
+\textit{Attention : ne pas laisser de ligne vide à la fin du fichier, ou d'espace inutile en fin de ligne.}\\
 
+Exemple :\\
+127.0.0.1 4242\\
+turing.u-strasbg.fr 5254\\
+turing.u-strasbg.fr 4024\\
 \newpage
 
 \section{Protocoles}
@@ -136,20 +146,14 @@ Le datagramme qui permet la communication est de la forme :
 Par la suite, on notera un datagramme de la façon suivante :
 
 \begin{center}
- \fbox{dg(code,seq,data)}
+ \fbox{\textbf{dg(code,seq,data)}}
 \end{center}
 
 Des paramètres peuvent être omis.
 
-Exemples :
-\begin{itemize}
- \item dg(0,0,texte)
- \item dg(5,458,)
- \item ...
-\end{itemize}
-
-
-code peut prendre sa valeur entre 0 et 6, ce qui correspond au type de paquet suivants :
+\vspace{0.3cm}
+\textbf{code} permet donc d'identifier à quoi correspond la suite du datagramme.
+\textbf{code} peut prendre sa valeur entre 0 et 6, ce qui correspond au type de paquet suivants :
 \begin{itemize}
  \item 0 = CONNECTRA
  \item 1 = DISCONNECTRA
@@ -182,11 +186,20 @@ Si le serveur trouve le fichier, il va répondre avec la taille du fichier en nu
 Par la suite le client envoie au serveur des paquets de la forme \textbf{dg(2,x,)}, avec \textbf{x} l'indice du dernier caractère du fichier que l'on souhaite recevoir.
 La fin du transfert est signifié à la réception d'un paquet contenant moins de 512 caractères.
 
+\subsubsection{Motivation des choix}
+Ce choix de protocole est proche dans l'esprit du protocole TFTP (RFC 1350), et relativement simple à implémenter. Il génère cependant beaucoup d'acquittements superflus.
+\subsubsection{Autre solution}
+On pourrait limiter le nombre d'acquittements en se contentant d'envoyer la taille du fichier, l'acquitter, puis le fichier en entier, et acquitter la totalité du fichier. Si des paquets sont perdus, le client peut, connaissant la taille du fichier, déterminer lesquelles sont manquant et en faire la demande explicite.
+
+
 \subsection{UPLOAD : Envoi d'un fichier sur un serveur}
 Pour initier la transaction, le client envoie le paquet \textbf{dg(3,x,)} et recoit en acquittement le paquet \textbf{dg(3,x,)}.
 Ensuite, le client envoie trois paquets contenant les métadonnées : \textbf{dg(3,0,nom du fichier)}, \textbf{dg(3,1,titre du fichier)}, et \textbf{dg(3,taille du fichier,)}. Le serveur acquitte les trois en renvoyant \textbf{dg(3,taille du fichier,)}.
 Pour le transfert des données, le client envoie un paquet contenant 512 caractères, \textbf{dg(3,seq,chaine de 512 caractères)} que le serveur acquitte par \textbf{dg(3,seq,)}.
 Un paquet de longueur inférieur à 512 signifie la fin de la transaction. \textbf{seq} indique la position du dernier caractères de la chaîne dans le fichier.
+
+\subsubsection{Motivation des choix}
+On pourrait d'abord penser que le transfert de fichier se fait de manière symétrique de client à serveur et de serveur à client. Mais celà impliquerai que le serveur devienne ``actif'', et qu'il gère lui aussi des timeouts.
 
 \subsection{ADD : ajout d'un fichier à la bibliotèque}
 Afin d'ajouter un fichier à la bibliotèque, le client envoie deux paquets contenant respectivement le nom du fichier et son titre (\textbf{dg(4,0,nom du fichier)} et \textbf{dg(4,1,titre du fichier)}).
@@ -202,7 +215,46 @@ Afin d'initier la transaction, le client envoie un paquet \textbf{dg(6,0,)}.
 Le serveur répond alors \textbf{dg(6,lignes,)} avec \textbf{lignes} le nombre d'entrée dans la bibliotèque.
 Le client peut alors demander la ième ligne de la bibliotèque (avec \textbf{dg(6,i,)}). Le serveur répond alors en envoyant deux paquets contenant respectivement un nom de fichier et le titre associé (\textbf{dg(6,i,nom du fichier)} et \textbf{dg(6,i+lignes,titre})).
 
+\newpage
+
 \section{Architecture}
+\subsection{Idée générale}
+Le projet se divise en (paires de) fichiers, chacune contenant une classe ou une structure de donnée. Chaque classe fournit des services. L'implémentation essaie de respecter au mieux le paradigme oritenté objet.
+
+En résumé :
+\begin{itemize}
+ \item \textbf{addr\_map} : structure de donnée permettant de lier une adresse à un état (voir \ref{sec:etat})
+ \item \textbf{AddrStorage} : encapsulation de la couche communication (voir \ref{sec:communication}), élément de addr\_map
+ \item \textbf{Client} : partie client, offre les services lire/stocker/détruire/catalogue.
+ \item \textbf{Converter} : classe outil permettant des conversions de type et le découpage de chaîne de caractères
+ \item \textbf{Counter} : compteur d'itération permettant le bloquage de la transaction
+ \item \textbf{Datagram} : définition du format du datagramme servant aux transactions
+ \item \textbf{Exception} : gestion d'exceptions
+ \item \textbf{File} : offre des services de lecture et d'écriture dans un fichier
+ \item \textbf{library} : structure de donnée permettant le stockage en mémoire du catalogue
+ \item \textbf{main} : point d'entrée de l'application
+ \item \textbf{Record} : élément due library
+ \item \textbf{Server} : partie serveur du projet
+ \item \textbf{Shell} : invite de commande permettant d'utiliser les services du client
+ \item \textbf{socket} : définition de quelques macros, contient les librairies nécessaire dans tout le projet
+ \item \textbf{State} : état d'une transaction, élément de addr\_map
+\end{itemize}
+
+
+\subsection{Serveur est un client}
+Dans certains cas, comme lorsque un serveur devient dépositaire d'un nouveau fichier, le serveur à un comportement très proche voir identique à un client. C'est pour ca que le serveur est un client à part entière, ce qui se traduit par la notion d'héritage en C++.
+
+\subsection{Serveur à état} \label{sec:etat}
+Un serveur sans état (stateless) est un serveur qui traite chaque requête indépendamment des précédentes. L'inconvénient est que chaque transaction doit contenir plus d'informations.\\
+Par opposition, un serveur à état (statefull) conserve une trace des transactions en cours. L'implémentation est plus complexe, mais les transactions sont plus légères. Le choix de protocole qui a été fait oblige l'implémentation d'un serveur à état. Il faut cependant être très attentif aux débuts et fin de transactions, car des déconnexion ``sauvages'' du client peuvent arrivés, et le serveur doit toujours rester dans un état cohérent.\\
+
+La connaissance d'un paquet et de son émetteur permettront de déterminer une réponse unique à renvoyer. 
+\subsection{Division en 3 couches}
+
+\subsubsection{Couche communication} \label{sec:communication}
+\subsubsection{Couche protocole}
+\subsubsection{Couche application}
+
 
 
 \end{document}
