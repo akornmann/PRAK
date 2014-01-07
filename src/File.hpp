@@ -5,19 +5,23 @@
 
 #include "socket.hpp"
 
+using namespace std;
+
 class File
 {
  public :
 	File() {};
-	File(std::string f);
+	File(string f);
+	~File();
 
+	static bool exist(const string &file);
 	void open();
 	void close();
 	//Ecriture dans le fichier
-	void write(const std::string &msg);
+	void write(const string &msg);
 	
 	//Lecture dans le fichier
-	std::string read(int n);
+	string read(int n);
 	char* readChar(int n);
 
 	//Infos sur le fichier
@@ -25,13 +29,13 @@ class File
 	int line();
 
 	//Setter/getter
-	void file(std::string file);
-	std::string file() const { return _file; };
+	void file(string file);
+	string file() const { return _file; };
 
  private :
-	std::string _file;
-	std::ofstream _out;
-	std::ifstream _in;
+	string _file;
+	ofstream _out;
+	ifstream _in;
 };
 
 #endif

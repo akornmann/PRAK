@@ -26,6 +26,9 @@ Server::Server(string port, string config):Client(config),_run(true)
 	}
 	
 	freeaddrinfo(start);
+
+	_timer = _timer/1000;
+
 	run();
 }
 
@@ -44,7 +47,6 @@ int Server::sock(const AddrStorage &addr)
 
 void Server::run()
 {
-
 	//Get a updated library
 	try
 	{
@@ -107,8 +109,8 @@ void Server::send_to(const Datagram &dg, const AddrStorage &addr)
 	int r = sendto(sock(addr),&cp,sizeof(Datagram),0,addr.sockaddr(),addr.len());
 	
 	if(r==-1) throw (Exception("Server::send_to : sendto failed.",__LINE__));
-	cout << getpid() << " : ";
-	cout << dg << " to " << addr << endl;
+
+	//cout << getpid() << " : "<< dg << " to " << addr << endl;
 	return;
 }
 
@@ -125,9 +127,8 @@ void Server::receive(Datagram &dg, AddrStorage *addr, int s)
 
 	if(r!=-1) addr->build(s);
 	else throw (Exception("Server::receive : recvfrom failed.", __LINE__));
-
-	cout << getpid() << " : ";
-	cout << dg << " from " << *addr << endl;
+	
+	//cout << getpid() << " : " << dg << " from " << *addr << endl;
 	return;
 }
 
@@ -164,128 +165,71 @@ void Server::disconnect_ack(const Datagram &dg, const AddrStorage &addr)
 void Server::send_file(const Datagram &dg, const AddrStorage &addr)
 {
 	int init, size;
-	string file,tmp;
+	string file;
 
-	Datagram asw,rcv;
+	Datagram asw;
 
 	State *current = &_client_map[addr];
 	File *f;
 
 	char *buffer;
- 
-	addr_map::iterator it;
 
 	switch(current->_status)
 	{
 	case CONNECT :
-		switch(dg.seq)
+		file = Converter::cstos(dg.data);
+		current->_file = file;
+			
+		switch(find_file(file))
 		{
-		case 0:
-			file = Converter::cstos(dg.data);
-			current->_file = file;
-			
-			switch(find_file(file))
-			{
-			case 2:
-				asw.init(DOWNLOAD,2,"File is here.");
-				send_to(asw,addr);
-				current->_status = META;
-				break;
-			case 1:
-				asw.init(DOWNLOAD,1,"File is in library, wait until I download it.");
-				send_to(asw,addr);
-				break;
-			case 0:
-				asw.init(DOWNLOAD,0,"File does'nt exist.");
-				send_to(asw,addr);
-				current->_status = DISCONNECT;
-				break;
-			default:
-				break;
-			}
+		case 2:
+			asw.init(DOWNLOAD,2,"File is here.");
+			current->_status = META;
 			break;
-
 		case 1:
-			file = Converter::cstos(dg.data);
-			switch(find_file(file))
+			if(dg.seq==1) //if a client ask
 			{
-			case 2:
-				asw.init(DOWNLOAD,2,"File is here.");
-				current->_status = META;
-				break;
-			case 1:
-				asw.init(DOWNLOAD,1,"Wait please.");
-				break;
-			case 0:
+				asw.init(DOWNLOAD,1,"File is in library, wait until I download it.");
+				import(file);
+				current->_status = DL;
+			}
+			else //if a server ask
+			{
 				asw.init(DOWNLOAD,0,"File does'nt exist.");
 				current->_status = DISCONNECT;
-				break;
-			default:
-				break;
 			}
-
-			send_to(asw,addr);
-
-			if(current->_status != DL)
-			{
-				try
-				{
-					switch(fork())
-					{
-					case -1:
-						throw (Exception("Fork operation failed.",__LINE__));
-						break;
-					case 0:
-						_run = false; //shut down server side
-						for(it=_server_map.begin();it!=_server_map.end();++it)
-						{
-							asw.init(DOWNLOAD,0,file);
-							rcv.init(DEFAULT,3);
-							Client::connect_req(it->first);
-							Client::receive_from(rcv,it->first);
-
-							Client::send_to(asw,it->first);
-							Client::receive_from(rcv,it->first);
-							switch(rcv.seq)
-							{
-							case 2:
-								tmp = Client::get_file(file,it->first);
-								cout << "file dl : " << tmp << endl;
-								f = new File(file);
-								f->write(tmp);
-								delete f;
-
-								Client::disconnect_req(it->first);
-								Client::receive_from(rcv,it->first);
-								exit(0);
-								break;
-
-							default:
-								break;
-							}
-						
-						}
-
-						exit(0);
-						break;
-					default:
-						break;
-					}
-			
-				}
-				catch(Exception e)
-				{
-				}
-			}
-
-			current->_status = DL; //Prevent DL more than one time
-
 			break;
-
+		case 0:
+			asw.init(DOWNLOAD,0,"File does'nt exist.");
+			current->_status = DISCONNECT;
+			break;
 		default:
 			break;
 		}
-	
+		send_to(asw,addr);
+		break;
+
+	case DL:
+		file = Converter::cstos(dg.data);
+		current->_file = file;
+			
+		switch(find_file(file))
+		{
+		case 2:
+			asw.init(DOWNLOAD,2,"File is here.");
+			current->_status = META;
+			break;
+		case 1:
+			asw.init(DOWNLOAD,1,"Wait please.");
+			break;
+		case 0:
+			asw.init(DOWNLOAD,0,"File does'nt exist.");
+			current->_status = DISCONNECT;
+			break;
+		default:
+			break;
+		}
+		send_to(asw,addr);
 		break;
 
 	case META :
@@ -325,7 +269,6 @@ void Server::send_file(const Datagram &dg, const AddrStorage &addr)
 		{
 			buffer[j-init] = current->_buffer[j];
 		}
-		
 		asw.init(DOWNLOAD,dg.seq,buffer);
 		send_to(asw,addr);
 		break;
@@ -444,8 +387,6 @@ void Server::add_file(const Datagram &dg, const AddrStorage &addr)
 	case 2:
 		//request from a client : sending info to other server
 		asw.init(ADD,dg.seq,"Ack");
-		send_to(asw,addr);
-
 		try
 		{
 			addr_map::iterator it;
@@ -455,7 +396,7 @@ void Server::add_file(const Datagram &dg, const AddrStorage &addr)
 				throw (Exception("Fork operation failed.",__LINE__));
 				break;
 			case 0:
-				_run = false; //shut down server side
+				_run = false; //shut down listening server side
 				for(it=_server_map.begin();it!=_server_map.end();++it)
 				{
 					Client::add_file(current->_file,current->_title,false,it->first);	
@@ -472,6 +413,7 @@ void Server::add_file(const Datagram &dg, const AddrStorage &addr)
 		{
 		}
 		
+		send_to(asw,addr);
 		break;
 	}
 
@@ -481,9 +423,8 @@ void Server::add_file(const Datagram &dg, const AddrStorage &addr)
 void Server::remove_file(const Datagram &dg, const AddrStorage &addr)
 {
 	string file = dg.data;
-	
+
 	Datagram asw(REMOVE,0);
-	send_to(asw,addr);
 
 	remove(dg.data); //rm file system
 	remove(_lib,file); //rm library
@@ -499,7 +440,7 @@ void Server::remove_file(const Datagram &dg, const AddrStorage &addr)
 				throw (Exception("Fork operation failed.",__LINE__));
 				break;
 			case 0:
-				_run = false; //shut down server side
+				_run = false; //shut down listening server side
 				for(it=_server_map.begin();it!=_server_map.end();++it)
 				{
 					Client::remove_file(file,false,it->first);
@@ -517,6 +458,7 @@ void Server::remove_file(const Datagram &dg, const AddrStorage &addr)
 		}
 	}
 
+	send_to(asw,addr);
 	return;
 }
 
@@ -608,19 +550,132 @@ int Server::find_file(const string &file)
 	{
 		if(it->file()==file) //if file is in library
 		{
-			File f(file);
-			if(f.size()>0) //file exist
+			if(File::exist(file)) //file exist
 			{
 				return 2;
 			}
 			else //file doesn't exist DL it !
-			{
-				remove(Converter::stocs(file));
-				
+			{				
 				return 1;
 			}
 		}
 	}
 
 	return 0;
+}
+
+void Server::import(const string &file)
+{
+	cout << ">>>>>>>>>>>>>>>>>>>>>>>>import<<<<<<<<<<<<<<<<<<<<<<<<<<" << endl;
+	addr_map::iterator it;
+	bool found = false;
+	Datagram rcv(DEFAULT);
+	Datagram ask(DEFAULT);
+
+
+	Counter c(RETRY,"");
+
+	string res;
+	File *f;
+
+	try
+	{
+		switch(fork())
+		{
+		case -1:
+			throw (Exception("Fork operation failed.",__LINE__));
+			break;
+		case 0:
+			for(it=_server_map.begin();it!=_server_map.end()&&!found;++it)
+			{
+				try
+				{
+					c.restart(RETRY,"");
+					rcv.init(DEFAULT);
+					do
+					{
+						Client::connect_req(it->first);
+						Client::receive_from(rcv,it->first);
+						++c;
+					}
+					while(rcv.seq!=1 || rcv.code!=CONNECTRA);
+
+					while(Client::receive_from(rcv,it->first)); //flush
+
+					c.restart(RETRY,"");
+					rcv.init(DEFAULT,3);
+					ask.init(DOWNLOAD,0,file);
+					do
+					{
+						Client::send_to(ask,it->first);
+						Client::receive_from(rcv,it->first);
+						++c;
+					}
+					while(rcv.seq!=2 || rcv.code!=DOWNLOAD);
+			
+					found = true;
+
+					while(Client::receive_from(rcv,it->first)); //flush
+						
+				}
+				catch(Exception e)
+				{
+				}
+			}
+			if(it==_server_map.end())
+			{
+				//this file does'nt exist anymore
+				Client::remove_file(file);
+			}
+			else
+			{
+				c.restart(RETRY,"");
+				rcv.init(DEFAULT);
+				do
+				{
+					Client::disconnect_req(it->first);
+					Client::receive_from(rcv,it->first);
+					++c;
+				}
+				while(rcv.seq!=0 || rcv.code!=DISCONNECTRA);
+				
+				//reconnect and start a standard dl
+				c.restart(RETRY,"");
+				do
+				{
+					Client::connect_req(it->first);
+					Client::receive_from(rcv,it->first);
+					++c;
+				}
+				while(rcv.seq!=1 || rcv.code!=CONNECTRA);
+				
+				while(Client::receive_from(rcv,it->first)); //flush
+				cout << it->first << "have the file, dl it" << endl;
+
+				res = Client::get_file(file,false,it->first);
+
+				f = new File(file);
+				f->write(res);
+				delete f;
+
+				c.restart(RETRY,"");
+				rcv.init(DEFAULT);
+				do
+				{
+					Client::disconnect_req(it->first);
+					Client::receive_from(rcv,it->first);
+					++c;
+				}
+				while(rcv.seq!=0 || rcv.code!=DISCONNECTRA);	
+			}
+			break;
+		default:
+			break;
+		}
+	}
+	catch(Exception e)
+	{
+	}
+
+	return;
 }

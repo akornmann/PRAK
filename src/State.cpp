@@ -60,6 +60,15 @@ ostream& operator<<(ostream& os, const State &s)
 		break;
 	case DISCONNECT :
 		status = "Disconnect";
+		break;	
+	case META :
+		status = "Meta";
+		break;
+	case DATA :
+		status = "Data";
+		break;
+	case DL :
+		status = "Dl";
 		break;
 	default :
 		status = "Unknow status";

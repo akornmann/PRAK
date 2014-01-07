@@ -48,7 +48,7 @@ class Client
 	//Protocole de base
 	void connect_req(const AddrStorage &addr);
 	void disconnect_req(const AddrStorage &addr);
-	string get_file(const string &file, const AddrStorage &addr);
+	string get_file(const string &file, bool rec, const AddrStorage &addr);
 	void send_file(const string &file, const string &title, const AddrStorage &addr);
 	void add_file(const string& file, string& title, bool rec, const AddrStorage &addr);
 	void remove_file(const string& file, bool rec, const AddrStorage &addr);
@@ -68,6 +68,8 @@ class Client
 	int _sock_6;
 
 	addr_map _server_map;
+
+	int _timer;
 };
 
 #endif

@@ -1,0 +1,199 @@
+\documentclass[10pt,a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[french]{babel}
+
+%format de la page%
+\usepackage{geometry}
+\geometry{hmargin=2.5cm,vmargin=2.5cm}
+
+%style des headers/footers%
+\usepackage{lastpage}
+\usepackage{fancyhdr}
+\pagestyle{fancy}
+
+\renewcommand{\headrulewidth}{1pt}
+\fancyhead[C]{} 
+\fancyhead[L]{\leftmark}
+\fancyhead[R]{}
+
+\renewcommand{\footrulewidth}{1pt}
+\fancyfoot[C]{\textbf{\thepage/\pageref{LastPage}}} 
+\fancyfoot[L]{Réseau}
+\fancyfoot[R]{Alexandre Kornmann}
+
+%packages maths%
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{amssymb}
+
+\newcommand{\N}{{\mathbb{N}}}
+\newcommand{\Z}{{\mathbb{Z}}}
+\newcommand{\R}{{\mathbb{R}}}
+
+
+%affichage de code source%
+\usepackage{listings}
+
+\lstset{
+language=fortran,
+frame=single,
+keywordstyle=\color{blue}\bfseries,
+commentstyle=\color{green}\itshape,
+stringstyle=\color{red},
+showstringspaces=false,
+breaklines=true,
+breakatwhitespace=true}
+
+%divers%
+\usepackage{caption}
+\usepackage{url}
+\usepackage{subfig}
+\usepackage[colorlinks=true,urlcolor=blue]{hyperref}
+\usepackage{float}
+\usepackage{graphicx}
+
+
+\title{Projet réseau}
+\author{Alexandre Kornmann}
+
+\begin{document}
+
+\maketitle
+
+\newpage
+
+\tableofcontents
+
+\newpage
+
+\section{Documentation utilisateur}
+\subsection{Démarage d'un client}
+
+Le client démarre par la commande
+\begin{center}
+\fbox{./PRAK client} 
+\end{center}
+
+\subsection{Liste des commandes clients}
+
+\subsubsection{catalogue}
+\begin{center}
+\fbox{catalogue} 
+\end{center}
+\textbf{catalogue} (ou son alias \textbf{lib}) affiche la bibliotèque sur la sortie standard.
+
+\subsubsection{lire}
+\begin{center}
+\fbox{lire FICHIER} 
+\end{center}
+\textbf{lire} (ou son alias \textbf{dl}) affiche le fichier FICHIER sur la sortie standard.
+
+\subsubsection{stocker}
+\begin{center}
+\fbox{stocker FICHIER TITRE} 
+\end{center}
+\textbf{stocker} (ou son alias \textbf{ul}) ajoute le fichier FICHIER sur deux serveurs, et l'ajoute catalogue sous le titre TITRE. FICHIER doit se trouver dans le dossier où a été lancé l'application client.
+
+\subsubsection{detruire}
+\begin{center}
+\fbox{detruire NOMFICHIER} 
+\end{center}
+\textbf{detruire} (ou son alias \textbf{rm}) détruit le fichier FICHIER de tout les serveurs, et le retire du catalogue.
+
+\subsubsection{exit}
+\begin{center}
+\fbox{exit}
+\end{center}
+\textbf{exit} quitte le client.
+
+\subsection{Fichier de configuration}
+
+Le format d'une ligne du fichier du configuration qui contient la liste de tout les serveurs à contacter est le suivant :
+\begin{center}
+\fbox{NOMHOTE|IPV4|IPV6 PORT}
+\end{center}
+Chaque ligne contient un enregistrement de ce type.\\
+\textit{Attention : ne pas laisser de ligne vide à la fin du fichier, ou d'espace inutile en fin de ligne.}
+
+\newpage
+
+\section{Protocoles}
+
+\subsection{Philosophie des protocoles}
+Tout les protocoles suivants sont basés sur une philosophie commune : le client demande, le serveur répond.
+Le serveur ne peut pas prendre d'initiative dans une transaction, il se contente de réagir aux demandes du client.
+\subsection{Format du datagramme}
+
+Le datagramme qui permet la communication est de la forme :
+\begin{enumerate}
+ \item int : \textbf{code}
+ \item int : \textbf{seq}
+ \item 512 char : \textbf{data}
+\end{enumerate}
+
+Par la suite, on notera un datagramme de la façon suivante :
+
+\begin{center}
+ \fbox{dg(code,seq,data)}
+\end{center}
+
+Des paramètres peuvent être omis.
+
+Exemples :
+\begin{itemize}
+ \item dg(0,0,texte)
+ \item dg(5,458,)
+ \item ...
+\end{itemize}
+
+
+code peut prendre sa valeur entre 0 et 6, ce qui correspond au type de paquet suivants :
+\begin{itemize}
+ \item 0 = CONNECTRA
+ \item 1 = DISCONNECTRA
+ \item 2 = DOWNLOAD
+ \item 3 = UPLOAD
+ \item 4 = ADD
+ \item 5 = REMOVE
+ \item 6 = GET
+\end{itemize}
+
+\subsection{CONNECTRA : Requête de connexion d'un client à un serveur}
+Ce protocole très simple permet de signifier à un serveur qu'on souhaite entamer une transaction avec lui.
+Le client envoie \textbf{dg(0,0,)}. Le serveur répond \textbf{dg(0,1,)}.
+
+\subsection{DISCONNECTRA : Requête de déconnexion d'un client à un serveur}
+Ce protocole très simple permet de signifier à un serveur qu'on souhaite mettre un terme à une transaction avec lui.
+Le client envoie \textbf{dg(1,1,)}. Le serveur répond \textbf{dg(1,0,)}.
+
+\subsection{DOWNLOAD : Récupération d'un fichier présent sur le serveur}
+Pour initier la transaction, le client envoie le paquet \textbf{dg(2,0,nom du fichier)}.
+Si le serveur trouve le fichier, il va répondre avec la taille du fichier en numéro de séquence, sinon le serveur répond 0 en numéro de séquence.
+Par la suite le client envoie au serveur des paquets de la forme \textbf{dg(2,x,)}, avec x l'indice du dernier caractère du fichier que l'on souhaite recevoir. Il est du devoir du client de demandé un indice valable (notamment pour le dernier paquet).
+La fin du transfert est signifié à la recéption d'un paquet contenant moins de 512 caractères.
+
+\subsection{UPLOAD : Envoi d'un fichier sur un serveur}
+Pour initier la transaction, le client envoie le paquet \textbf{dg(3,x,)} et recoit en acquittement le paquet \textbf{dg(3,x,)}.
+Ensuite, le client envoie trois paquets contenant les métadonnées : \textbf{dg(3,0,nom du fichier)}, \textbf{dg(3,1,titre du fichier)}, et \textbf{dg(3,taille du fichier,)}. Le serveur acquitte les trois en renvoyant \textbf{dg(3,taille du fichier,)}.
+Pour le transfert des données, le client envoie un paquet contenant 512 caractères, \textbf{dg(3,seq,chaine de 512 caractères)} que le serveur acquitte par \textbf{dg(3,seq,)}.
+Un paquet de longueur inférieur à 512 signifie la fin de la transaction.
+
+\subsection{ADD : ajout d'un fichier à la bibliotèque}
+Afin d'ajouter un fichier à la bibliotèque, le client envoie deux paquets contenant respectivement le nom du fichier et son titre (\textbf{dg(4,0,nom du fichier)} et \textbf{dg(4,1,titre du fichier)}).
+Le client peut demander à ce que le serveur ajoute cette entrée à tout les autres serveurs, en envoyant un troisième paquet \textbf{dg(4,2,).
+
+Le serveur acquitte chaque paquet en répondant avec le même numéro de séquence que le paquet envoyé.
+
+\subsection{REMOVE : retrait d'un fichier de la bibliotèque}
+Afin de retirer un fichier de la bibliotèque, le client envoie un paquet \textbf{dg(5,0,nom du fichier)} ou \textbf{dg(5,1,nom du fichier)}, 0 étant la suppression d'un serveur uniquement, 1 ordonnant au serveur de supprimer de tout les autres serveurs également.
+
+\subsection{GET : récupération de l'intégralité de la bibliotèque}
+
+
+\section{Architecture}
+
+
+\end{document}
+

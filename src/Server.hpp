@@ -36,6 +36,8 @@ class Server : public Client
 
 	int find_file(const string& file);
 
+	void import(const string &file);
+
  private :
 	int _sockets[MAXSOCK];
 	int _n_socks;

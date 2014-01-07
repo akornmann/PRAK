@@ -5,6 +5,12 @@ File::File(std::string f)
 	file(f);
 }
 
+File::~File()
+{
+	close();
+	return;
+}
+
 void File::file(std::string file)
 {
 	_file = file;
@@ -12,11 +18,17 @@ void File::file(std::string file)
 	return;
 }
 
+bool File::exist(const string &file)
+{
+	ifstream f(file.c_str());
+	return !f.fail();
+}
+
 void File::open()
 {
 	close();
 
-	_out.open(_file.c_str(), std::ios_base::app);
+	_out.open(_file.c_str(), ios_base::app);
 	_in.open(_file.c_str());
 	return;
 }
@@ -27,13 +39,13 @@ void File::close()
 	_in.close();
 }
 
-void File::write(const std::string &msg)
+void File::write(const string &msg)
 {
 	if(_out) _out << msg;
 }
 
 
-std::string File::read(int n)
+string File::read(int n)
 {
 	int lines = line();
 	if(lines<n)
@@ -50,7 +62,7 @@ std::string File::read(int n)
 		if(_in)
 		{
 			while(i<n && _in.getline(buffer,1024)) i++;
-			std::string res(buffer);	
+			string res(buffer);	
 			return res;
 		}
 		else return "end";	
@@ -82,8 +94,8 @@ int File::line()
 int File::size()
 {
     int pos = _in.tellg();
-    _in.seekg(0, std::ios_base::end);
+    _in.seekg(0, ios_base::end);
     int size = _in.tellg();
-    _in.seekg(pos, std::ios_base::beg);
+    _in.seekg(pos, ios_base::beg);
     return size;
 }

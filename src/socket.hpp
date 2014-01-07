@@ -21,8 +21,6 @@
 
 #define MAXSOCK 5
 
-#define TIMER 1
-
 #define RETRY 5
 
 #endif

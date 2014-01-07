@@ -1,7 +1,7 @@
 #include "Client.hpp"
 
 
-Client::Client(string &config)
+Client::Client(string &config):_timer(100000)
 {
 	File conf(config);
 	
@@ -95,8 +95,7 @@ void Client::send_to(const Datagram &dg, const AddrStorage &addr)
 		throw (Exception("send_to : Failed", __LINE__));
 	}
 
-	cout << getpid() << " : ";
-	cout << dg << " to " << addr << endl;
+	//cout << getpid() << " : " << dg << " to " << addr << endl;
 	return;
 }
 
@@ -111,8 +110,8 @@ bool Client::receive(Datagram &dg, AddrStorage *addr)
 
 	temp_len = sizeof(struct sockaddr_storage);
 
-	time_val.tv_sec = 1;
-	time_val.tv_usec = 0;
+	time_val.tv_sec = 0;
+	time_val.tv_usec = _timer;
 
 	FD_ZERO(&readfds);
 	FD_SET(_sock_4,&readfds);
@@ -142,8 +141,7 @@ bool Client::receive(Datagram &dg, AddrStorage *addr)
 			dg.code = ntohs(dg.code);
 			dg.seq = ntohs(dg.seq);
 
-			cout << getpid() << " : ";
-			cout << dg << " from " << *addr << endl;
+			//cout << getpid() << " : " << dg << " from " << *addr << endl;
 		}
 		else throw (Exception("received : Failed.", __LINE__));
 	}
@@ -165,8 +163,8 @@ bool Client::receive_from(Datagram &dg, const AddrStorage &addr)
 
 	temp_len = sizeof(struct sockaddr_storage);
 
-	time_val.tv_sec = TIMER;
-	time_val.tv_usec = 0;
+	time_val.tv_sec = 0;
+	time_val.tv_usec = _timer;
 
 	FD_ZERO(&readfds);
 	FD_SET(sock(addr), &readfds);
@@ -181,13 +179,12 @@ bool Client::receive_from(Datagram &dg, const AddrStorage &addr)
 		if(e(addr,incoming))
 		{
 			if(r!=-1)
-			{	
+			{
 				dg.code = ntohs(dg.code);
 				dg.seq = ntohs(dg.seq);
 
 				res = true;
-				cout << getpid() << " : ";
-				cout << dg << " from " << addr << endl;
+				//cout << getpid() << " : " << dg << " from " << addr << endl;
 			}
 			else throw (Exception("receive_from : Failed.", __LINE__));
 		}
@@ -228,11 +225,11 @@ void Client::disconnect_req(const AddrStorage &addr)
 	return;
 }
 
-string Client::get_file(const string &file, const AddrStorage &addr)
+string Client::get_file(const string &file, bool rec, const AddrStorage &addr)
 {
 	//INIT
-	Datagram ask(DOWNLOAD,0,file);
-	Datagram rcv(DEFAULT);
+	Datagram ask(DOWNLOAD,rec,file);
+	Datagram rcv(DEFAULT,3);
 	
 	Counter c(RETRY,"Too many packets lost, download abort.");
 	do
@@ -240,14 +237,14 @@ string Client::get_file(const string &file, const AddrStorage &addr)
 		send_to(ask,addr);
 		receive_from(rcv,addr);
 
-		cout << "rcv " << rcv << endl;
 		switch(rcv.seq)
 		{
 		case 2:
 			break;
 		case 1:
-			ask.init(DOWNLOAD,1,file);
-			rcv.init(DEFAULT);
+			ask.init(DOWNLOAD,rec,file);
+			rcv.init(DEFAULT,3);
+			usleep(1000000); //1sec
 			c.restart(RETRY,"Too many packets lost, download abort.");
 			break;
 		case 0:
@@ -262,6 +259,9 @@ string Client::get_file(const string &file, const AddrStorage &addr)
 	while(rcv.seq!=2 || rcv.code!=DOWNLOAD);
 
 	//META
+	ask.init(DOWNLOAD,rec,file);
+	rcv.init(DEFAULT);
+
 	c.restart(RETRY,"Too many packets lost, download abort.");
 	do
 	{
@@ -566,7 +566,7 @@ void Client::get_file(string file)
 	string res;
 	try
 	{
-		res = get_file(file,*(addr[0]));
+		res = get_file(file,true,*(addr[0]));
 	}
 	catch(Exception e)
 	{
@@ -597,8 +597,8 @@ void Client::send_file(string file, string title)
 	{
 		remove_file(file,true,*(addr[0]));
 	
-		send_file(file,title,*(addr[1]));
 		send_file(file,title,*(addr[0]));
+		send_file(file,title,*(addr[1]));
 
 		add_file(file,title,true,*(addr[1]));
 	}

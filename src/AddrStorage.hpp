@@ -1,8 +1,6 @@
 #ifndef ADDRSTORAGE
 #define ADDRSTORAGE
 
-// TODO REVOIR SERVER SIDE CONSTRUCTOR
-
 #include "socket.hpp"
 #include "File.hpp"
 #include "Converter.hpp"
@@ -28,7 +26,7 @@ class AddrStorage
 	string pport() const;
 	socklen_t len() const;
 	int family() const;
-	struct sockaddr* sockaddr() const;
+	struct sockaddr * sockaddr() const;
 	
 	friend ostream & operator<<(ostream &os, const AddrStorage &addr);
 
