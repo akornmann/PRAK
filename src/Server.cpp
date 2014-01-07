@@ -48,11 +48,12 @@ void Server::run()
 	//Get a updated library
 	try
 	{
-		vector<AddrStorage*> *addr = Client::synchronize();
+		vector<AddrStorage*> addr;
+		Client::synchronize(addr);
 
-		if(addr->size()<1) throw (Exception("There is no server active, unable ton find a library.",__LINE__));
+		if(addr.size()<1) throw (Exception("There is no server active, unable ton find a library.",__LINE__));
 
-		_lib = Client::get_library(*((*addr)[0]));
+		_lib = Client::get_library(*(addr[0]));
 
 		Client::disconnect(addr);
 	}
@@ -163,7 +164,7 @@ void Server::disconnect_ack(const Datagram &dg, const AddrStorage &addr)
 void Server::send_file(const Datagram &dg, const AddrStorage &addr)
 {
 	int init, size;
-	string file;
+	string file,tmp;
 
 	Datagram asw,rcv;
 
@@ -172,13 +173,14 @@ void Server::send_file(const Datagram &dg, const AddrStorage &addr)
 
 	char *buffer;
  
-	Counter c(RETRY,"");
 	addr_map::iterator it;
+
 	switch(current->_status)
 	{
 	case CONNECT :
-		if(dg.seq==0)
+		switch(dg.seq)
 		{
+		case 0:
 			file = Converter::cstos(dg.data);
 			current->_file = file;
 			
@@ -192,7 +194,6 @@ void Server::send_file(const Datagram &dg, const AddrStorage &addr)
 			case 1:
 				asw.init(DOWNLOAD,1,"File is in library, wait until I download it.");
 				send_to(asw,addr);
-				current->_status = DISCONNECT;
 				break;
 			case 0:
 				asw.init(DOWNLOAD,0,"File does'nt exist.");
@@ -202,11 +203,87 @@ void Server::send_file(const Datagram &dg, const AddrStorage &addr)
 			default:
 				break;
 			}
+			break;
+
+		case 1:
+			file = Converter::cstos(dg.data);
+			switch(find_file(file))
+			{
+			case 2:
+				asw.init(DOWNLOAD,2,"File is here.");
+				current->_status = META;
+				break;
+			case 1:
+				asw.init(DOWNLOAD,1,"Wait please.");
+				break;
+			case 0:
+				asw.init(DOWNLOAD,0,"File does'nt exist.");
+				current->_status = DISCONNECT;
+				break;
+			default:
+				break;
+			}
+
+			send_to(asw,addr);
+
+			if(current->_status != DL)
+			{
+				try
+				{
+					switch(fork())
+					{
+					case -1:
+						throw (Exception("Fork operation failed.",__LINE__));
+						break;
+					case 0:
+						_run = false; //shut down server side
+						for(it=_server_map.begin();it!=_server_map.end();++it)
+						{
+							asw.init(DOWNLOAD,0,file);
+							rcv.init(DEFAULT,3);
+							Client::connect_req(it->first);
+							Client::receive_from(rcv,it->first);
+
+							Client::send_to(asw,it->first);
+							Client::receive_from(rcv,it->first);
+							switch(rcv.seq)
+							{
+							case 2:
+								tmp = Client::get_file(file,it->first);
+								cout << "file dl : " << tmp << endl;
+								f = new File(file);
+								f->write(tmp);
+								delete f;
+
+								Client::disconnect_req(it->first);
+								Client::receive_from(rcv,it->first);
+								exit(0);
+								break;
+
+							default:
+								break;
+							}
+						
+						}
+
+						exit(0);
+						break;
+					default:
+						break;
+					}
 			
-		}
-		else
-		{
-			//HERRRRRRRRE
+				}
+				catch(Exception e)
+				{
+				}
+			}
+
+			current->_status = DL; //Prevent DL more than one time
+
+			break;
+
+		default:
+			break;
 		}
 	
 		break;

@@ -230,11 +230,39 @@ void Client::disconnect_req(const AddrStorage &addr)
 
 string Client::get_file(const string &file, const AddrStorage &addr)
 {
-	//META
-	Datagram ask(DOWNLOAD,META,file);
+	//INIT
+	Datagram ask(DOWNLOAD,0,file);
 	Datagram rcv(DEFAULT);
-
+	
 	Counter c(RETRY,"Too many packets lost, download abort.");
+	do
+	{
+		send_to(ask,addr);
+		receive_from(rcv,addr);
+
+		cout << "rcv " << rcv << endl;
+		switch(rcv.seq)
+		{
+		case 2:
+			break;
+		case 1:
+			ask.init(DOWNLOAD,1,file);
+			rcv.init(DEFAULT);
+			c.restart(RETRY,"Too many packets lost, download abort.");
+			break;
+		case 0:
+			throw (Exception("File doesn't exist.",__LINE__));
+			break;
+		default:
+			break;
+		}
+		
+		++c;
+	}
+	while(rcv.seq!=2 || rcv.code!=DOWNLOAD);
+
+	//META
+	c.restart(RETRY,"Too many packets lost, download abort.");
 	do
 	{
 		send_to(ask,addr);
@@ -484,7 +512,7 @@ library & Client::get_library(const AddrStorage& addr)
  */
 
 
-vector<AddrStorage *> * Client::synchronize()
+void Client::synchronize(vector<AddrStorage *> &addr)
 {
 
 	addr_map::const_iterator it_map;
@@ -494,9 +522,7 @@ vector<AddrStorage *> * Client::synchronize()
 		connect_req(it_map->first);
 	}
 
-	vector<AddrStorage *> *addr = new vector<AddrStorage *>;
-
-	Datagram dg(DISCONNECTRA);
+	Datagram dg(DEFAULT);
 
 	vector<AddrStorage *>::iterator it;
 
@@ -507,20 +533,20 @@ vector<AddrStorage *> * Client::synchronize()
 		res = receive(dg,temp_addr);
 		if(res&&dg.code==CONNECTRA)
 		{
-			it = addr->begin();
-			it = addr->insert(it,temp_addr);
+			it = addr.begin();
+			it = addr.insert(it,temp_addr);
 		}
 	}
 	while(res);
 
-	return addr;
+	return;
 }
 
-void Client::disconnect(vector<AddrStorage *> *addr)
+void Client::disconnect(vector<AddrStorage *> &addr)
 {
 	vector<AddrStorage *>::iterator it;
-	Datagram dg(CONNECTRA);
-	for(it=addr->begin();it!=addr->end();++it)
+	Datagram dg(DEFAULT);
+	for(it=addr.begin();it!=addr.end();++it)
 	{
 		disconnect_req(**it);
 		receive_from(dg,**it);
@@ -532,57 +558,15 @@ void Client::get_file(string file)
 {
 	if(file == "") throw (Exception("File name can't be empty.", __LINE__));
 	
-	vector<AddrStorage*> *addr = synchronize();
+	vector<AddrStorage*> addr;
+	synchronize(addr);
 
-	if(addr->size()<1) throw (Exception("There is no server active, unable to get any file.",__LINE__));
-
-	AddrStorage *addr_f;
-
-	//INITIATE
-	Datagram ask(DOWNLOAD,0,file);
-	Datagram rcv(DEFAULT,3);
-	
-	Counter c(RETRY,"Too many packets lost, download abort.");
-	unsigned int k=0;
-	vector<AddrStorage *>::iterator it;
-
-	do
-	{
-		send_to(ask,*((*addr)[k]));
-		receive_from(rcv,*((*addr)[k]));
-		
-		switch(rcv.seq)
-		{
-		case 2:
-			addr_f = (*addr)[k];
-			break;
-		case 1:
-			k++;
-			break;
-		case 0:
-			throw (Exception("File doesn't exist.",__LINE__));
-			break;
-		default:
-			k++;
-			break;
-		}
-
-		if(k>=addr->size())
-		{
-			remove_file(file); //correct library
-			throw (Exception("File doesn't exist.",__LINE__));
-		}
-		
-		++c;
-	}
-	while(rcv.seq!=2 || rcv.code!=DOWNLOAD);
-	
-	if(rcv.seq==0) throw (Exception("File doesn't exist.",__LINE__));
+	if(addr.size()<1) throw (Exception("There is no server active, unable to get any file.",__LINE__));
 
 	string res;
 	try
 	{
-		res = get_file(file,*addr_f);
+		res = get_file(file,*(addr[0]));
 	}
 	catch(Exception e)
 	{
@@ -604,18 +588,19 @@ void Client::send_file(string file, string title)
 	if(file == "") throw (Exception("File name can't be empty.",__LINE__));
 	if(title == "") throw (Exception("Title can't be empty.", __LINE__));
 
-	vector<AddrStorage*> *addr = synchronize();
+	vector<AddrStorage*> addr;
+	synchronize(addr);
 
-	if(addr->size()<2) throw (Exception("There is less than one server active, unable to send any file.",__LINE__));
+	if(addr.size()<2) throw (Exception("There is less than one server active, unable to send any file.",__LINE__));
 
 	try
 	{
-		remove_file(file,true,*((*addr)[0]));
+		remove_file(file,true,*(addr[0]));
 	
-		send_file(file,title,*((*addr)[1]));
-		send_file(file,title,*((*addr)[0]));
+		send_file(file,title,*(addr[1]));
+		send_file(file,title,*(addr[0]));
 
-		add_file(file,title,true,*((*addr)[1]));
+		add_file(file,title,true,*(addr[1]));
 	}
 	catch(Exception e)
 	{
@@ -632,13 +617,14 @@ void Client::send_file(string file, string title)
 
 void Client::remove_file(string file)
 {
-	vector<AddrStorage*> *addr = synchronize();
+	vector<AddrStorage*> addr;
+	synchronize(addr);
 
-	if(addr->size()<1) throw (Exception("There is less than one server active, unable to remove any file.",__LINE__));
+	if(addr.size()<1) throw (Exception("There is less than one server active, unable to remove any file.",__LINE__));
 
 	try
 	{
-		remove_file(file,true,*((*addr)[0]));
+		remove_file(file,true,*(addr[0]));
 	}
 	catch(Exception e)
 	{
@@ -655,14 +641,15 @@ void Client::remove_file(string file)
 
 void Client::get_library()
 {
-	vector<AddrStorage*> *addr = synchronize();
+	vector<AddrStorage*> addr;
+	synchronize(addr);
 
-	if(addr->size()<1) throw (Exception("There is no server active, unable to find a library.",__LINE__));
+	if(addr.size()<1) throw (Exception("There is no server active, unable to find a library.",__LINE__));
 
 	library lib;
 	try
 	{
-		lib = get_library(*((*addr)[0]));
+		lib = get_library(*(addr[0]));
 	}
 	catch(Exception e)
 	{

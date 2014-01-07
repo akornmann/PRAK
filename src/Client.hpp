@@ -56,8 +56,8 @@ class Client
 	library & get_library(const AddrStorage& addr);
 
 	//Surcouche client
-	vector<AddrStorage *> * synchronize();
-	void disconnect(vector<AddrStorage *> *addr);
+	void synchronize(vector<AddrStorage *> &addr);
+	void disconnect(vector<AddrStorage *> &addr);
 	void get_file(string file);
 	void send_file(string file, string title);
 	void remove_file(string file);

@@ -13,6 +13,7 @@ enum Status
 	DATA,
 	DISCONNECT,
 	CONNECT,
+	DL,
 };
 
 class State
