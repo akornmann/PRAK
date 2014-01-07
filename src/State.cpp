@@ -1,11 +1,11 @@
 #include "State.hpp"
 
-State::State():_status(DISCONNECT),_init_seq(0),_size(0),_file(""),_title(""),_buffer(NULL)
+State::State():_status(DISCONNECT),_size(0),_file(""),_title(""),_buffer(NULL)
 {
 }
 
 
-State::State(Status s):_status(s),_init_seq(0),_size(0),_file(""),_title(""),_buffer(NULL)
+State::State(Status s):_status(s),_size(0),_file(""),_title(""),_buffer(NULL)
 {
 }
 
@@ -23,7 +23,6 @@ void State::refresh()
 	_file = "";
 	_title = "";
 	_size = 0;
-	_init_seq = 0;
 	_received_packet.resize(0);
 
 	_status = DISCONNECT;
@@ -61,9 +60,6 @@ ostream& operator<<(ostream& os, const State &s)
 		break;
 	case DISCONNECT :
 		status = "Disconnect";
-		break;
-	case ACTIVE :
-		status = "Active";
 		break;
 	default :
 		status = "Unknow status";

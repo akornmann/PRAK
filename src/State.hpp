@@ -9,12 +9,10 @@ using namespace std;
 
 enum Status
 {
-	CONNECT,
-	DISCONNECT,
-	ACTIVE,
 	META,
 	DATA,
-	MINSIZE,
+	DISCONNECT,
+	CONNECT,
 };
 
 class State
@@ -35,7 +33,6 @@ public :
 	Status _status;
 
 	//PACKET RECEIVED
-	int _init_seq;
 	vector<bool> _received_packet;
 
 	//METADATA

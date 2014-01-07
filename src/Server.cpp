@@ -44,6 +44,7 @@ int Server::sock(const AddrStorage &addr)
 
 void Server::run()
 {
+
 	//Get a updated library
 	try
 	{
@@ -98,9 +99,16 @@ void Server::run()
 
 void Server::send_to(const Datagram &dg, const AddrStorage &addr)
 {
-	int r = sendto(sock(addr),&dg,sizeof(Datagram),0,addr.sockaddr(),addr.len());
+	Datagram cp = dg;
+	cp.code = htons(dg.code);
+	cp.seq = htons(dg.seq);
+
+	int r = sendto(sock(addr),&cp,sizeof(Datagram),0,addr.sockaddr(),addr.len());
 	
 	if(r==-1) throw (Exception("Server::send_to : sendto failed.",__LINE__));
+	cout << getpid() << " : ";
+	cout << dg << " to " << addr << endl;
+	return;
 }
 
 void Server::receive(Datagram &dg, AddrStorage *addr, int s)
@@ -110,10 +118,15 @@ void Server::receive(Datagram &dg, AddrStorage *addr, int s)
 	temp_len = sizeof(struct sockaddr_storage);
 
 	int r = recvfrom(s,&dg,sizeof(Datagram),0,(struct sockaddr*) temp_addr, &temp_len);
-	
+
+	dg.code = ntohs(dg.code);
+	dg.seq = ntohs(dg.seq);
+
 	if(r!=-1) addr->build(s);
 	else throw (Exception("Server::receive : recvfrom failed.", __LINE__));
 
+	cout << getpid() << " : ";
+	cout << dg << " from " << *addr << endl;
 	return;
 }
 
@@ -127,18 +140,23 @@ void Server::receive(Datagram &dg, AddrStorage *addr, int s)
 
 void Server::connect_ack(const Datagram &dg, const AddrStorage &addr)
 {
-	Datagram s(CONNECTRA, dg.seq+1, "Hey pretty client !");
 	_client_map[addr].refresh();
 	_client_map[addr]._status = CONNECT;
+
+	Datagram s(CONNECTRA, 1, "Hey pretty client !");
 	send_to(s,addr);
+
 	return;
 }
 
 void Server::disconnect_ack(const Datagram &dg, const AddrStorage &addr)
 {
-	Datagram s(DISCONNECTRA, dg.seq-1, "Bye lovely client !");
 	_client_map[addr].refresh();
+	_client_map[addr]._status = DISCONNECT;
+
+	Datagram s(DISCONNECTRA, 0, "Bye lovely client !");
 	send_to(s,addr);
+
 	return;
 }
 
@@ -147,41 +165,80 @@ void Server::send_file(const Datagram &dg, const AddrStorage &addr)
 	int init, size;
 	string file;
 
-	Datagram asw;
+	Datagram asw,rcv;
 
 	State *current = &_client_map[addr];
 	File *f;
 
 	char *buffer;
-	
-	if(dg.seq==META) current->_status = META;
-
+ 
+	Counter c(RETRY,"");
+	addr_map::iterator it;
 	switch(current->_status)
 	{
-	case META :
-		file = Converter::cstos(dg.data);
-		if(find_file(file))
+	case CONNECT :
+		if(dg.seq==0)
 		{
+			file = Converter::cstos(dg.data);
+			current->_file = file;
+			
+			switch(find_file(file))
+			{
+			case 2:
+				asw.init(DOWNLOAD,2,"File is here.");
+				send_to(asw,addr);
+				current->_status = META;
+				break;
+			case 1:
+				asw.init(DOWNLOAD,1,"File is in library, wait until I download it.");
+				send_to(asw,addr);
+				current->_status = DISCONNECT;
+				break;
+			case 0:
+				asw.init(DOWNLOAD,0,"File does'nt exist.");
+				send_to(asw,addr);
+				current->_status = DISCONNECT;
+				break;
+			default:
+				break;
+			}
+			
+		}
+		else
+		{
+			//HERRRRRRRRE
+		}
+	
+		break;
+
+	case META :
+		file = current->_file;
+		switch(find_file(file))
+		{
+		case 2: //local file
 			f = new File(file);
 			size = f->size();
 			asw.init(DOWNLOAD,size,"Here is meta !");
 			send_to(asw,addr);
 			current->_status = DATA;
-			current->_file = file;
 			current->_buffer = f->readChar(size);
 			current->_size = size;
 			delete f;
-		}
-		else
-		{
-			asw.init(DOWNLOAD,-1,"File doesn't exist !");
+
+			break;
+
+		case 1:
+		case 0:
+			asw.init(DOWNLOAD,0,"File doesn't exist.");
 			send_to(asw,addr);
-			current->refresh();
+		default:
+			break;
 		}
+		
 		break;
 
 	case DATA :
-		if(dg.seq == current->_size) init = dg.seq-(dg.seq%(DATASIZE-1));
+		if(dg.seq >= current->_size) init = dg.seq-(dg.seq%(DATASIZE-1));
 		else init = dg.seq-(DATASIZE-1);
 		
 		buffer = new char[dg.seq-init+1];
@@ -216,18 +273,16 @@ void Server::get_file(const Datagram &dg, const AddrStorage &addr)
 	case CONNECT :
 		asw.init(UPLOAD,dg.seq,"I'm ready !");
 		send_to(asw,addr);
-		current->_init_seq = dg.seq;
 		current->_status = META;
 		break;
 
 	case META :
-		if(dg.seq==-2)
-		{
-			current->_file = dg.data;
-			remove(dg.data);
-		}
-		if(dg.seq==-1) current->_title = dg.data;
-		if(dg.seq>MINSIZE)
+		//file name
+		if(dg.seq==0) current->_file = dg.data;
+		//title
+		if(dg.seq==1) current->_title = dg.data;
+		//size
+		if(dg.seq>1)
 		{
 			current->_size = dg.seq;
 			current->_buffer = new char[dg.seq+1];
@@ -238,9 +293,10 @@ void Server::get_file(const Datagram &dg, const AddrStorage &addr)
 
 		if(current->is_meta())
 		{
-			asw.init(UPLOAD,0,"Metas are nice.");
+			asw.init(UPLOAD,current->_size,"Metas are nice.");
 			send_to(asw,addr);
 			current->_status = DATA;
+			remove(Converter::stocs(current->_file));
 		}
 		break;
 
@@ -273,8 +329,6 @@ void Server::get_file(const Datagram &dg, const AddrStorage &addr)
 			f = new File(current->_file);
 			f->write(Converter::cstos(current->_buffer));
 			delete f;
-
-			current->refresh();
 		}
 		break;
 
@@ -295,12 +349,12 @@ void Server::add_file(const Datagram &dg, const AddrStorage &addr)
 
 	switch(dg.seq)
 	{
-	case -2:
+	case 0:
 		current->_file = dg.data;
 		asw.init(ADD,dg.seq,"Ack");
 		send_to(asw,addr);
 		break;
-	case -1:
+	case 1:
 		current->_title = dg.data;
 		asw.init(ADD,dg.seq,"Ack");
 		send_to(asw,addr);
@@ -310,21 +364,35 @@ void Server::add_file(const Datagram &dg, const AddrStorage &addr)
 
 		break;
 
-	case 1:
+	case 2:
 		//request from a client : sending info to other server
 		asw.init(ADD,dg.seq,"Ack");
 		send_to(asw,addr);
 
-		for(it=_server_map.begin();it!=_server_map.end();++it)
+		try
 		{
-		
-			try
+			addr_map::iterator it;
+			switch(fork())
 			{
-				Client::add_file(current->_file,current->_title,false,it->first);
+			case -1:
+				throw (Exception("Fork operation failed.",__LINE__));
+				break;
+			case 0:
+				_run = false; //shut down server side
+				for(it=_server_map.begin();it!=_server_map.end();++it)
+				{
+					Client::add_file(current->_file,current->_title,false,it->first);	
+				}
+				exit(0);
+
+				break;
+			default:
+				break;
 			}
-			catch(Exception e)
-			{
-			}
+			
+		}
+		catch(Exception e)
+		{
 		}
 		
 		break;
@@ -336,22 +404,39 @@ void Server::add_file(const Datagram &dg, const AddrStorage &addr)
 void Server::remove_file(const Datagram &dg, const AddrStorage &addr)
 {
 	string file = dg.data;
+	
+	Datagram asw(REMOVE,0);
+	send_to(asw,addr);
 
 	remove(dg.data); //rm file system
 	remove(_lib,file); //rm library
 
 	if(dg.seq>0) //recursive mode
 	{
-		addr_map::iterator it_map;
-		for(it_map=_server_map.begin();it_map!=_server_map.end();++it_map)
+		try
 		{
-			try
+			addr_map::iterator it;
+			switch(fork())
 			{
-				Client::remove_file(file,false,it_map->first);
+			case -1:
+				throw (Exception("Fork operation failed.",__LINE__));
+				break;
+			case 0:
+				_run = false; //shut down server side
+				for(it=_server_map.begin();it!=_server_map.end();++it)
+				{
+					Client::remove_file(file,false,it->first);
+				}
+				exit(0);
+
+				break;
+			default:
+				break;
 			}
-			catch(Exception e)
-			{
-			}
+			
+		}
+		catch(Exception e)
+		{
 		}
 	}
 
@@ -364,17 +449,17 @@ void Server::send_library(const Datagram &dg, const AddrStorage &addr)
 	unsigned int size;
 	switch(dg.seq)
 	{
-	case -1:
+	case 0:
 		asw.init(GET,_lib.size(),"Here is meta !");
 		send_to(asw,addr);
 		break;
 	default:
 		size = dg.seq;
-		if(size>=0&&size<_lib.size())
+		if(size>0&&size<=_lib.size())
 		{
-			asw.init(GET,dg.seq,_lib[dg.seq].file());
+			asw.init(GET,dg.seq,_lib[dg.seq-1].file());
 			send_to(asw,addr);
-			asw.init(GET,dg.seq,_lib[dg.seq].title());
+			asw.init(GET,dg.seq,_lib[dg.seq-1].title());
 			send_to(asw,addr);
 		}
 		break;
@@ -394,10 +479,10 @@ void Server::process(const Datagram &dg, const AddrStorage &addr)
 	{
 		switch(dg.code)
 		{
-		case CONNECT :
+		case CONNECTRA :
 			connect_ack(dg,addr);
 			break;
-		case DISCONNECT :
+		case DISCONNECTRA :
 			disconnect_ack(dg,addr);
 			break;
 		case DOWNLOAD :
@@ -438,7 +523,7 @@ void Server::update_client_map(const AddrStorage &addr)
 	return;
 }
 
-bool Server::find_file(const string &file)
+int Server::find_file(const string &file)
 {
 	library::iterator it;
 
@@ -449,31 +534,16 @@ bool Server::find_file(const string &file)
 			File f(file);
 			if(f.size()>0) //file exist
 			{
-				return true;
+				return 2;
 			}
-			else //file doesnt exist DL it !
+			else //file doesn't exist DL it !
 			{
 				remove(Converter::stocs(file));
 				
-				try
-				{
-					vector<AddrStorage*> *addr = Client::synchronize();
-
-					if(addr->size()<1) throw (Exception("There is no server active, unable to get any file.",__LINE__));
-
-					string res = Client::get_file(file,*addr);
-					Client::disconnect(addr);
-					
-					File f(file);
-					f.write(res);
-				}
-				catch(Exception e)
-				{
-				}
-				return false;
+				return 1;
 			}
 		}
 	}
 
-	return false;
+	return 0;
 }

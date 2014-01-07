@@ -29,6 +29,7 @@ enum Protocol
 	ADD,
 	REMOVE,
 	GET,
+	DEFAULT,
 };
 
 class Client
@@ -47,7 +48,7 @@ class Client
 	//Protocole de base
 	void connect_req(const AddrStorage &addr);
 	void disconnect_req(const AddrStorage &addr);
-	string get_file(const string &file, vector<AddrStorage *> addr);
+	string get_file(const string &file, const AddrStorage &addr);
 	void send_file(const string &file, const string &title, const AddrStorage &addr);
 	void add_file(const string& file, string& title, bool rec, const AddrStorage &addr);
 	void remove_file(const string& file, bool rec, const AddrStorage &addr);
@@ -55,7 +56,6 @@ class Client
 	library & get_library(const AddrStorage& addr);
 
 	//Surcouche client
-	void flush();
 	vector<AddrStorage *> * synchronize();
 	void disconnect(vector<AddrStorage *> *addr);
 	void get_file(string file);

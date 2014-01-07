@@ -20,7 +20,7 @@ Client::Client(string &config)
 			string p = v[1];
 
 			//Convert hostname->ip
-			const char *hostname = a.c_str();
+			const char *hostname = Converter::stocs(a);
 			struct addrinfo hints, *res;
 			struct in_addr tmp;
 
@@ -84,12 +84,19 @@ int Client::sock(const AddrStorage &addr)
 
 void Client::send_to(const Datagram &dg, const AddrStorage &addr)
 {
-	int r = sendto(sock(addr), &dg, sizeof(Datagram), 0, addr.sockaddr(), addr.len());
+	Datagram cp = dg;
+	cp.code = htons(dg.code);
+	cp.seq = htons(dg.seq);
+
+	int r = sendto(sock(addr), &cp, sizeof(Datagram), 0, addr.sockaddr(), addr.len());
 			
 	if(r==-1)
 	{
 		throw (Exception("send_to : Failed", __LINE__));
 	}
+
+	cout << getpid() << " : ";
+	cout << dg << " to " << addr << endl;
 	return;
 }
 
@@ -131,6 +138,12 @@ bool Client::receive(Datagram &dg, AddrStorage *addr)
 		{
 			addr->build(s);
 			res = true;
+
+			dg.code = ntohs(dg.code);
+			dg.seq = ntohs(dg.seq);
+
+			cout << getpid() << " : ";
+			cout << dg << " from " << *addr << endl;
 		}
 		else throw (Exception("received : Failed.", __LINE__));
 	}
@@ -168,12 +181,13 @@ bool Client::receive_from(Datagram &dg, const AddrStorage &addr)
 		if(e(addr,incoming))
 		{
 			if(r!=-1)
-			{
-				cout << "rcv " << dg.code << " " << ntohs(dg.code) << endl;
+			{	
 				dg.code = ntohs(dg.code);
 				dg.seq = ntohs(dg.seq);
-				
+
 				res = true;
+				cout << getpid() << " : ";
+				cout << dg << " from " << addr << endl;
 			}
 			else throw (Exception("receive_from : Failed.", __LINE__));
 		}
@@ -196,54 +210,47 @@ void Client::connect_req(const AddrStorage &addr)
 {
 	Datagram dg(CONNECTRA,0,"Is there any server here ?");
 	send_to(dg,addr);
+
+	_server_map[addr].refresh();
+	_server_map[addr]._status = CONNECT;
 	
 	return;
 }
 
 void Client::disconnect_req(const AddrStorage &addr)
 {
-	Datagram dg(DISCONNECTRA,0,"It's time to leave.");
+	Datagram dg(DISCONNECTRA,1,"It's time to leave.");
 	send_to(dg,addr);
+
+	_server_map[addr].refresh();
+	_server_map[addr]._status = DISCONNECT;
 
 	return;
 }
 
-string Client::get_file(const string &file, vector<AddrStorage *> addr)
+string Client::get_file(const string &file, const AddrStorage &addr)
 {
-	if(file == "") throw (Exception("File name can't be empty.", __LINE__));
-
-	Datagram rcv(0,-2);
-
 	//META
-	Datagram start(DOWNLOAD,META,file);
+	Datagram ask(DOWNLOAD,META,file);
+	Datagram rcv(DEFAULT);
 
-	unsigned int k=0;
-	Counter c(5,"This file doesn't exist !");
+	Counter c(RETRY,"Too many packets lost, download abort.");
 	do
 	{
-		send_to(start,*addr[k]);	
-		receive_from(rcv,*addr[k]);
-
-		if(rcv.seq==-1)
-		{
-			//This server doesn't have the requested file
-			rcv.init(0,-2);
-			k++;
-			if(k>=addr.size()) throw (Exception("This file doesn't exist",__LINE__));
-		}
+		send_to(ask,addr);
+		receive_from(rcv,addr);
 		++c;
 	}
-	while(rcv.seq<0 || rcv.code != DOWNLOAD);
+	while(rcv.seq==0 || rcv.code!=DOWNLOAD);
 
 	int size = rcv.seq;
+
+	//DATA
 	char *buffer = new char[size+1];
 	buffer[size] = '\0';
 	int packet_number = ceil((float) size / (float) (DATASIZE-1));
-	
-	//DATA
-	Datagram ask;
-	rcv.init(0,0);
-	
+	string tmp;
+
 	for(int i=1;i<=packet_number;i++)
 	{
 		int seq;
@@ -261,18 +268,18 @@ string Client::get_file(const string &file, vector<AddrStorage *> addr)
 			to_read = size-(i-1)*(DATASIZE-1);
 		}
 		
-		Datagram ask(DOWNLOAD,seq);
+		ask.init(DOWNLOAD,seq);
+		rcv.init(DEFAULT);
 		
-		string tmp;
-		c.restart(5,"Too many packets lost, download abort.");
+		c.restart(RETRY,"Too many packets lost, download abort.");
 		do
 		{
-			send_to(ask,*addr[k]);	
-			receive_from(rcv,*addr[k]);
+			send_to(ask,addr);	
+			receive_from(rcv,addr);
+			tmp=Converter::cstos(rcv.data);
 			++c;
-			tmp =Converter::cstos(rcv.data);
 		}
-		while(rcv.seq!=seq || rcv.code != DOWNLOAD || tmp.length() != to_read);
+		while(rcv.seq!=seq || rcv.code!=DOWNLOAD || tmp.length()!=to_read);
 
 		init = seq-to_read;
 
@@ -288,38 +295,38 @@ string Client::get_file(const string &file, vector<AddrStorage *> addr)
 
 void Client::send_file(const string &file, const string &title,const AddrStorage &addr)
 {		
-	if(file == "") throw (Exception("File name can't be empty",addr,__LINE__));
 	File f(file);
 	int size = f.size();
-	if(size<=MINSIZE)
+
+	if(size<=1)
 	{
 		remove(Converter::stocs(file));
-		throw (Exception("This file doesn't exist !",addr, __LINE__));
+		throw (Exception("This file doesn't exist.",addr, __LINE__));
 	}
-	if(title == "") throw (Exception("Title can't be empty.",addr, __LINE__));
-	Datagram rcv;
+
+	Datagram rcv(DEFAULT);
+	int init_seq = 17; //maybe use rand
+	Datagram ask(UPLOAD,init_seq,"Wake up lazzy server !");
+	
 	char* buffer;
 
 	//INITIATE TRANSFERT
-	int init_seq = 1; //never use 0 !!!
-	Datagram start(UPLOAD,init_seq,"Wake up lazzy server !");
-
-	Counter c(5, "Connection to server failed.");
+	Counter c(RETRY, "Connection to server failed.");
 	do
 	{
-		send_to(start,addr);
-		
+		send_to(ask,addr);
 		receive_from(rcv,addr);
+
 		++c;
 	}
-	while(rcv.seq != init_seq || rcv.code != UPLOAD);
+	while(rcv.seq!=init_seq || rcv.code!=UPLOAD);
 	
 	//SENDING METADATA
-	Datagram meta_file(UPLOAD,-2,file);
-	Datagram meta_title(UPLOAD,-1,title);
+	Datagram meta_file(UPLOAD,0,file);
+	Datagram meta_title(UPLOAD,1,title);
 	Datagram meta_size(UPLOAD,size);
 
-	c.restart(5,"Too many packets lost, upload abort");
+	c.restart(RETRY,"Too many packets lost, upload abort.");
 	do
 	{
 		send_to(meta_file,addr);
@@ -329,7 +336,7 @@ void Client::send_file(const string &file, const string &title,const AddrStorage
 		receive_from(rcv,addr);
 		++c;
 	}
-	while(rcv.seq != 0 || rcv.code != UPLOAD);
+	while(rcv.seq!=size || rcv.code!=UPLOAD);
 
 	//SENDING DATA
 	int packet_number = ceil((float) size/(float) (DATASIZE-1));
@@ -350,14 +357,14 @@ void Client::send_file(const string &file, const string &title,const AddrStorage
 		buffer = f.readChar(to_read);
 		Datagram up(UPLOAD,seq,Converter::cstos(buffer));
 
-		c.restart(5,"Too many packets lost, upload abort.");
+		c.restart(RETRY,"Too many packets lost, upload abort.");
 		do
 		{
 			send_to(up,addr);
 			receive_from(rcv,addr);
 			++c;
 		}
-		while(rcv.seq!=seq || rcv.code != UPLOAD);
+		while(rcv.seq!=seq || rcv.code!=UPLOAD);
 
 		delete[] buffer;
 	}
@@ -368,35 +375,35 @@ void Client::send_file(const string &file, const string &title,const AddrStorage
 
 void Client::add_file(const string& file, string& title, bool rec, const AddrStorage &addr)
 {
-	Datagram t(ADD,-1,Converter::stocs(title));
-	Datagram f(ADD,-2,Converter::stocs(file));
+	Datagram f(ADD,0,Converter::stocs(file));
+	Datagram t(ADD,1,Converter::stocs(title));
 
-	Datagram rcv;
+	Datagram rcv(DEFAULT);
 
-	Counter c(5,"Adding file to library abort.");
+	Counter c(RETRY,"Too many packets lost, adding file to library abort.");
 	do
 	{
 		send_to(f,addr);
-		
 		receive_from(rcv,addr);
+
 		++c;
 	}
-	while(rcv.seq != -2 || rcv.code != ADD);
+	while(rcv.seq!=f.seq || rcv.code!=ADD);
 	
-	c.restart(5,"Too many packets lost, adding file to library abort.");
+	c.restart(RETRY,"Too many packets lost, adding file to library abort.");
 	do
 	{
-		send_to(t,addr);
-		
+		send_to(t,addr);	
 		receive_from(rcv,addr);
+
 		++c;
 	}
-	while(rcv.seq != -1 || rcv.code != ADD);
+	while(rcv.seq!=t.seq || rcv.code!=ADD);
 
 	if(rec)
 	{
-		c.restart(5,"Too many packets lost, adding file to others library abort.");
-		Datagram r(ADD,1,"I'm a client, start recursive mode");
+		c.restart(RETRY,"Too many packets lost, adding file to others library abort.");
+		Datagram r(ADD,2,"I'm a client, start recursive mode");
 		do
 		{
 			send_to(r,addr);
@@ -404,7 +411,7 @@ void Client::add_file(const string& file, string& title, bool rec, const AddrSto
 			receive_from(rcv,addr);
 			++c;
 		}
-		while(rcv.seq != 1 || rcv.code != ADD);
+		while(rcv.seq!=2 || rcv.code!=ADD);
 	}
 
 	return;
@@ -414,19 +421,29 @@ void Client::remove_file(const string& file, bool rec, const AddrStorage &addr)
 {
 	Datagram dg(REMOVE,rec,Converter::stocs(file));
 
-	send_to(dg,addr);
+	Datagram rcv(DEFAULT);
 
+	Counter c(RETRY,"Remove file from library abort.");
+	do
+	{
+		send_to(dg,addr);
+		receive_from(rcv,addr);
+
+		++c;
+	}
+	while(rcv.seq!=0 || rcv.code!=REMOVE);
+	
 	return;	
 }
 
 library & Client::get_library(const AddrStorage& addr)
 {
 	library &lib = *new library;
-	Datagram rcv(0,-1);
-	Datagram rcv2(0,-1);
+	Datagram rcv(DEFAULT);
+	Datagram rcv2(DEFAULT);
 
 	//META
-	Datagram start(GET,-1,"Wake up and send me some metas !");
+	Datagram start(GET,0,"Wake up and send me some metas !");
 
 	Counter c(5,"Getting library abort.");
 	do
@@ -435,12 +452,12 @@ library & Client::get_library(const AddrStorage& addr)
 		receive_from(rcv,addr);
 		++c;
 	}
-	while(rcv.seq<0 || rcv.code != GET);
+	while(rcv.seq==0 && rcv.code != GET);
 	
 	int size = rcv.seq;
 
 	Datagram s;
-	for(int i=0;i<size;i++)
+	for(int i=1;i<=size;i++)
 	{
 		s.init(GET,i,"Send me this line please");
 		c.restart(5,"Too many packets lost, getting library abort.");
@@ -496,7 +513,6 @@ vector<AddrStorage *> * Client::synchronize()
 	}
 	while(res);
 
-
 	return addr;
 }
 
@@ -514,31 +530,98 @@ void Client::disconnect(vector<AddrStorage *> *addr)
 
 void Client::get_file(string file)
 {
+	if(file == "") throw (Exception("File name can't be empty.", __LINE__));
+	
 	vector<AddrStorage*> *addr = synchronize();
 
 	if(addr->size()<1) throw (Exception("There is no server active, unable to get any file.",__LINE__));
 
-	string res = get_file(file,*addr);
+	AddrStorage *addr_f;
+
+	//INITIATE
+	Datagram ask(DOWNLOAD,0,file);
+	Datagram rcv(DEFAULT,3);
+	
+	Counter c(RETRY,"Too many packets lost, download abort.");
+	unsigned int k=0;
+	vector<AddrStorage *>::iterator it;
+
+	do
+	{
+		send_to(ask,*((*addr)[k]));
+		receive_from(rcv,*((*addr)[k]));
+		
+		switch(rcv.seq)
+		{
+		case 2:
+			addr_f = (*addr)[k];
+			break;
+		case 1:
+			k++;
+			break;
+		case 0:
+			throw (Exception("File doesn't exist.",__LINE__));
+			break;
+		default:
+			k++;
+			break;
+		}
+
+		if(k>=addr->size())
+		{
+			remove_file(file); //correct library
+			throw (Exception("File doesn't exist.",__LINE__));
+		}
+		
+		++c;
+	}
+	while(rcv.seq!=2 || rcv.code!=DOWNLOAD);
+	
+	if(rcv.seq==0) throw (Exception("File doesn't exist.",__LINE__));
+
+	string res;
+	try
+	{
+		res = get_file(file,*addr_f);
+	}
+	catch(Exception e)
+	{
+		disconnect(addr);
+		throw e;
+	}
+
 	disconnect(addr);
 
        	cout << endl << "---- " << file << " ----" << endl << endl;
 	cout << res << endl;
 	cout << endl << "---------------" << endl << endl;
+
 	return;
 }
 
 void Client::send_file(string file, string title)
 {
+	if(file == "") throw (Exception("File name can't be empty.",__LINE__));
+	if(title == "") throw (Exception("Title can't be empty.", __LINE__));
+
 	vector<AddrStorage*> *addr = synchronize();
 
 	if(addr->size()<2) throw (Exception("There is less than one server active, unable to send any file.",__LINE__));
 
-	remove_file(file,true,*((*addr)[0]));
+	try
+	{
+		remove_file(file,true,*((*addr)[0]));
 	
-	send_file(file,title,*((*addr)[0]));
-	send_file(file,title,*((*addr)[1]));
+		send_file(file,title,*((*addr)[1]));
+		send_file(file,title,*((*addr)[0]));
 
-	add_file(file,title,true,*((*addr)[0]));
+		add_file(file,title,true,*((*addr)[1]));
+	}
+	catch(Exception e)
+	{
+		disconnect(addr);
+		throw e;
+	}
 
 	disconnect(addr);
 
@@ -553,7 +636,16 @@ void Client::remove_file(string file)
 
 	if(addr->size()<1) throw (Exception("There is less than one server active, unable to remove any file.",__LINE__));
 
-	remove_file(file,true,*((*addr)[0]));
+	try
+	{
+		remove_file(file,true,*((*addr)[0]));
+	}
+	catch(Exception e)
+	{
+		disconnect(addr);
+		throw e;
+	}
+
 	disconnect(addr);
 
 	cout << endl << file << " removed with succes." << endl << endl;
@@ -567,7 +659,16 @@ void Client::get_library()
 
 	if(addr->size()<1) throw (Exception("There is no server active, unable to find a library.",__LINE__));
 
-	library lib = get_library(*((*addr)[0]));
+	library lib;
+	try
+	{
+		lib = get_library(*((*addr)[0]));
+	}
+	catch(Exception e)
+	{
+		disconnect(addr);
+		throw e;
+	}
 
 	disconnect(addr);
 

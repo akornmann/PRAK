@@ -34,7 +34,7 @@ class Server : public Client
 	void process(const Datagram &dg, const AddrStorage &addr);
 	void update_client_map(const AddrStorage &addr);
 
-	bool find_file(const string& file);
+	int find_file(const string& file);
 
  private :
 	int _sockets[MAXSOCK];
