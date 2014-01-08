@@ -52,7 +52,6 @@ class Client
 	void send_file(const string &file, const string &title, const AddrStorage &addr);
 	void add_file(const string& file, string& title, bool rec, const AddrStorage &addr);
 	void remove_file(const string& file, bool rec, const AddrStorage &addr);
-
 	library & get_library(const AddrStorage& addr);
 
 	//Surcouche client

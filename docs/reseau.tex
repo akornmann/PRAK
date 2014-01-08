@@ -240,15 +240,28 @@ En résumé :
  \item \textbf{State} : état d'une transaction, élément de addr\_map
 \end{itemize}
 
-
 \subsection{Serveur est un client}
 Dans certains cas, comme lorsque un serveur devient dépositaire d'un nouveau fichier, le serveur à un comportement très proche voir identique à un client. C'est pour ca que le serveur est un client à part entière, ce qui se traduit par la notion d'héritage en C++.
 
+\begin{figure}[H]
+ \centering
+ \includegraphics[width=12cm]{Diagramme1}
+ \caption{Schéma de l'organisation des composants}
+\end{figure}
+
+\newpage
 \subsection{Serveur à état} \label{sec:etat}
 Un serveur sans état (stateless) est un serveur qui traite chaque requête indépendamment des précédentes. L'inconvénient est que chaque transaction doit contenir plus d'informations.\\
 Par opposition, un serveur à état (statefull) conserve une trace des transactions en cours. L'implémentation est plus complexe, mais les transactions sont plus légères. Le choix de protocole qui a été fait oblige l'implémentation d'un serveur à état. Il faut cependant être très attentif aux débuts et fin de transactions, car des déconnexion ``sauvages'' du client peuvent arrivés, et le serveur doit toujours rester dans un état cohérent.\\
 
-La connaissance d'un paquet et de son émetteur permettront de déterminer une réponse unique à renvoyer. 
+La connaissance d'un paquet et de son émetteur permettront de déterminer une réponse unique à renvoyer. Ceci est traduit dans la structure addr\_map, qui relie un émetteur à son état.
+
+\begin{figure}[H]
+ \centering
+ \includegraphics[width=8cm]{Diagramme3}
+ \caption{Diagramme état/transition du serveur}
+\end{figure}
+
 \subsection{Division en 3 couches}
 
 \subsubsection{Couche communication} \label{sec:communication}
