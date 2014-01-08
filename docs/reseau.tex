@@ -82,6 +82,8 @@ Le client démarre par la commande
 \begin{center}
 \fbox{./PRAK server xxxx}
 \end{center}avec xxxx, un port libre sur la machine courante. 
+
+\textit{Il faut démarrer chaque serveur dans un \textbf{dossier différent}, afin que chacun est ses propres fichiers, et afin d'éviter tout comportement indésirable.}
 \subsection{Liste des commandes clients}
 
 \subsubsection{catalogue}
@@ -165,11 +167,11 @@ Des paramètres peuvent être omis.
 \end{itemize}
 
 \subsection{CONNECTRA : Requête de connexion d'un client à un serveur}
-Ce protocole très simple permet de signifier à un serveur qu'on souhaite entamer une transaction avec lui.
+Ce protocole très simple permet de signifier à un serveur qu'on souhaite entamer une transaction avec le serveur.
 Le client envoie \textbf{dg(0,0,)}. Le serveur répond \textbf{dg(0,1,)}.
 
 \subsection{DISCONNECTRA : Requête de déconnexion d'un client à un serveur}
-Ce protocole très simple permet de signifier à un serveur qu'on souhaite mettre un terme à une transaction avec lui.
+Ce protocole très simple permet de signifier à un serveur qu'on souhaite mettre un terme à une transaction avec le serveur.
 Le client envoie \textbf{dg(1,1,)}. Le serveur répond \textbf{dg(1,0,)}.
 
 \subsection{DOWNLOAD : Récupération d'un fichier présent sur le serveur}
@@ -177,7 +179,7 @@ Pour initier la transaction, le client envoie le paquet \textbf{dg(2,0,nom du fi
 Les réponses possibles sont :
 \begin{itemize}
  \item \textbf{dg(2,2,)} : Le fichier est dans la librairie et est disponible sur le serveur.
- \item \textbf{dg(2,1,)} : Le fichier est dans la librairie masi n'est pas disponible sur le serveur.
+ \item \textbf{dg(2,1,)} : Le fichier est dans la librairie mais n'est pas disponible sur le serveur.
  \item \textbf{dg(2,0,)} : Le fichier n'est pas dans la bibliotèque
 \end{itemize}
 
@@ -200,6 +202,12 @@ Un paquet de longueur inférieur à 512 signifie la fin de la transaction. \text
 
 \subsubsection{Motivation des choix}
 On pourrait d'abord penser que le transfert de fichier se fait de manière symétrique de client à serveur et de serveur à client. Mais celà impliquerai que le serveur devienne ``actif'', et qu'il gère lui aussi des timeouts.
+
+\begin{figure}[H]
+ \centering
+ \includegraphics[width=7cm]{Diagramme6}
+ \caption{Représentation schématique du protocole UPLOAD}
+\end{figure}
 
 \subsection{ADD : ajout d'un fichier à la bibliotèque}
 Afin d'ajouter un fichier à la bibliotèque, le client envoie deux paquets contenant respectivement le nom du fichier et son titre (\textbf{dg(4,0,nom du fichier)} et \textbf{dg(4,1,titre du fichier)}).
@@ -252,22 +260,32 @@ Dans certains cas, comme lorsque un serveur devient dépositaire d'un nouveau fi
 \newpage
 \subsection{Serveur à état} \label{sec:etat}
 Un serveur sans état (stateless) est un serveur qui traite chaque requête indépendamment des précédentes. L'inconvénient est que chaque transaction doit contenir plus d'informations.\\
-Par opposition, un serveur à état (statefull) conserve une trace des transactions en cours. L'implémentation est plus complexe, mais les transactions sont plus légères. Le choix de protocole qui a été fait oblige l'implémentation d'un serveur à état. Il faut cependant être très attentif aux débuts et fin de transactions, car des déconnexion ``sauvages'' du client peuvent arrivés, et le serveur doit toujours rester dans un état cohérent.\\
+Par opposition, un serveur à état (statefull) conserve une trace des transactions en cours. L'implémentation est plus complexe, mais les transactions sont plus légères. Le choix de protocole qui a été fait oblige l'implémentation d'un serveur à état.
+Il faut cependant être très attentif aux débuts et fin de transactions, car des déconnexion ``sauvages'' du client peuvent arrivées, et le serveur doit toujours rester dans un état cohérent.\\
 
 La connaissance d'un paquet et de son émetteur permettront de déterminer une réponse unique à renvoyer. Ceci est traduit dans la structure addr\_map, qui relie un émetteur à son état.
 
 \begin{figure}[H]
  \centering
  \includegraphics[width=8cm]{Diagramme3}
- \caption{Diagramme état/transition du serveur}
+ \caption{Diagramme de fonctionnement du serveur}
 \end{figure}
 
 \subsection{Division en 3 couches}
-
+L'application peut-être divisée en trois couches. En partant de la couche communication, qui encapsule toute la gestion des sockets, à la couche application, de plus haut niveau.
+Chaque couche fait appel aux services offerts par la couche inférieur.
+\begin{figure}[H]
+ \centering
+ \includegraphics[width=8cm]{Diagramme4}
+ \caption{Séparation des couches dans la classe client}
+\end{figure}
 \subsubsection{Couche communication} \label{sec:communication}
+Cette couche est relative à l'ensemble des tâches liées à la gestion des sockets et des adresses. Elle contient notamment la classe \textbf{AddrStorage} qui permet d'unifier le fonctionnement IPv4 et IPv6.
+Cette couche contient également les méthodes du type \textbf{receive} et \textbf{send} des classes \textbf{Client} et \textbf{Server}. lEs constructeurs de ces deux dernières classes peuvent aussi être considéré dans cette couche, puisqu'ils déclarent les sockets. La méthode \textbf{run} du serveur quand a elle permet d'écouter sur les sockets, et fait donc partie de cette couche.
 \subsubsection{Couche protocole}
+Le contenu de cette couche est très simple à délimiter : elle contient tout les protocoles d'échanges (connexion, fichiers et bibliotèque).
 \subsubsection{Couche application}
-
+Les services offerts par cette couche sont ceux que l'utilisateur voit le plus directement : \textbf{get\_file} (lire), \textbf{send\_file} (stocker), \textbf{remove\_file} (détruire), \textbf{get\_library} (catalogue).
 
 
 \end{document}

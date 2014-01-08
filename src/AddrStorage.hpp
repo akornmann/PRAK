@@ -13,7 +13,6 @@ class AddrStorage
 	AddrStorage(); //From Server side : client adress (part 1)
 	void build(int s); //From Server side : client address (part 2)
 
-	//AddrStorage(struct sockaddr *addr, int s); //From Server side : client address
 	AddrStorage(string addr, string port); //From Client side : server address
 	AddrStorage(const AddrStorage &as); //copy constructor
 	AddrStorage & operator=(const AddrStorage &as); //assignement operator
