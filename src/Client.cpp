@@ -232,6 +232,7 @@ string Client::get_file(const string &file, bool rec, const AddrStorage &addr)
 	Datagram rcv(DEFAULT,3);
 	
 	Counter c(RETRY,"Too many packets lost, download abort.");
+	Counter global(20*RETRY, "Unknow error, download abort.");
 	do
 	{
 		send_to(ask,addr);
@@ -255,6 +256,7 @@ string Client::get_file(const string &file, bool rec, const AddrStorage &addr)
 		}
 		
 		++c;
+		++global;
 	}
 	while(rcv.seq!=2 || rcv.code!=DOWNLOAD);
 
