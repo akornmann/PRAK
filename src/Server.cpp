@@ -566,7 +566,6 @@ int Server::find_file(const string &file)
 
 void Server::import(const string &file)
 {
-	cout << ">>>>>>>>>>>>>>>>>>>>>>>>import<<<<<<<<<<<<<<<<<<<<<<<<<<" << endl;
 	addr_map::iterator it;
 	bool found = false;
 	Datagram rcv(DEFAULT);
@@ -622,52 +621,59 @@ void Server::import(const string &file)
 				{
 				}
 			}
-			if(it==_server_map.end())
+			try
 			{
-				//this file does'nt exist anymore
-				Client::remove_file(file);
+				if(it==_server_map.end())
+				{
+					//this file does'nt exist anymore
+					Client::remove_file(file);
+				}
+				else
+				{
+					c.restart(RETRY,"");
+					rcv.init(DEFAULT);
+					do
+					{
+						Client::disconnect_req(it->first);
+						Client::receive_from(rcv,it->first);
+						++c;
+					}
+					while(rcv.seq!=0 || rcv.code!=DISCONNECTRA);
+				
+					//reconnect and start a standard dl
+					c.restart(RETRY,"");
+					do
+					{
+						Client::connect_req(it->first);
+						Client::receive_from(rcv,it->first);
+						++c;
+					}
+					while(rcv.seq!=1 || rcv.code!=CONNECTRA);
+				
+					while(Client::receive_from(rcv,it->first)); //flush
+
+					res = Client::get_file(file,false,it->first);
+
+					f = new File(file);
+					f->write(res);
+					delete f;
+
+					c.restart(RETRY,"");
+					rcv.init(DEFAULT);
+					do
+					{
+						Client::disconnect_req(it->first);
+						Client::receive_from(rcv,it->first);
+						++c;
+					}
+					while(rcv.seq!=0 || rcv.code!=DISCONNECTRA);	
+				}
 			}
-			else
+			catch(Exception e)
 			{
-				c.restart(RETRY,"");
-				rcv.init(DEFAULT);
-				do
-				{
-					Client::disconnect_req(it->first);
-					Client::receive_from(rcv,it->first);
-					++c;
-				}
-				while(rcv.seq!=0 || rcv.code!=DISCONNECTRA);
-				
-				//reconnect and start a standard dl
-				c.restart(RETRY,"");
-				do
-				{
-					Client::connect_req(it->first);
-					Client::receive_from(rcv,it->first);
-					++c;
-				}
-				while(rcv.seq!=1 || rcv.code!=CONNECTRA);
-				
-				while(Client::receive_from(rcv,it->first)); //flush
-				cout << it->first << "have the file, dl it" << endl;
-
-				res = Client::get_file(file,false,it->first);
-
-				f = new File(file);
-				f->write(res);
-				delete f;
-
-				c.restart(RETRY,"");
-				rcv.init(DEFAULT);
-				do
-				{
-					Client::disconnect_req(it->first);
-					Client::receive_from(rcv,it->first);
-					++c;
-				}
-				while(rcv.seq!=0 || rcv.code!=DISCONNECTRA);	
+				exit(0);
 			}
+			exit(0);
 			break;
 		default:
 			break;
